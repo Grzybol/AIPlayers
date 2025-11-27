@@ -1,0 +1,17 @@
+ai:
+  tick-interval-ticks: 10
+  default:
+    behavior-mode: WANDER
+    controller-type: DUMMY
+  http:
+    enabled: true
+    base-url: "http://localhost:8081/ai/decision"
+    timeout-millis: 500
+  openai:
+    enabled: false
+    api-key: "CHANGE_ME"
+    model: "gpt-4.1-mini"
+chat:
+  history-size: 20
+economy:
+  enabled: true
