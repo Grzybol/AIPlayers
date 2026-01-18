@@ -56,6 +56,7 @@ public class AIPlayersPlugin extends JavaPlugin {
                 new OpenAIAIController(this, config, new DummyAIController())
         );
 
+        loadProfiles();
         registerCommands();
         registerListeners();
         startTickTask();
@@ -82,7 +83,9 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // TODO: persist AI players to disk using storage
+        aiPlayerManager.getAllSessions().forEach(session ->
+                session.getProfile().setLastKnownLocation(session.getNpcHandle().getLocation()));
+        storage.saveAll(aiPlayerManager.getAllProfiles());
         aiPlayerManager.despawnAll();
         getLogger().info("AIPlayers disabled");
     }
@@ -105,6 +108,11 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     public AIPlayerStorage getStorage() {
         return storage;
+    }
+
+    private void loadProfiles() {
+        storage.loadAll().forEach(aiPlayerManager::addProfile);
+        getLogger().info("Loaded " + aiPlayerManager.getAllProfiles().size() + " AI player profiles.");
     }
 
     private AIControllerType parseControllerType(String value) {

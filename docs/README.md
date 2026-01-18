@@ -7,6 +7,7 @@ AIPlayers provides AI-controlled player-like agents for Paper 1.18.2 servers. Ea
 - **AI player lifecycle:** Profiles are created with UUID-backed identities and spawned as visible entities at a chosen location; despawning clears the session while keeping the profile in memory. Inventories and ender chests are standard Bukkit containers so admins can view or edit them directly. Economy accounts are created when Vault is available. 
 - **Chat participation:** AI players can broadcast formatted chat messages and the plugin tracks a rolling history for controller context.
 - **Economy awareness:** Balances are read through Vault, letting future behaviors consider or modify funds alongside movement and chat.
+- **Profile persistence:** AI player profiles (controller, behavior, metadata, and last known location) are saved to `profiles.yml` on shutdown and reloaded on startup.
 
 ## Commands
 All commands require the `aiplayers.admin` permission.
