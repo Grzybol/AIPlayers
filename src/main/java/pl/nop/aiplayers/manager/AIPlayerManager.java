@@ -25,10 +25,15 @@ public class AIPlayerManager {
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
     private final AIEconomyService economyService;
+    private final AIControllerType defaultControllerType;
+    private final AIBehaviorMode defaultBehaviorMode;
 
-    public AIPlayerManager(Plugin plugin, AIEconomyService economyService) {
+    public AIPlayerManager(Plugin plugin, AIEconomyService economyService, AIControllerType defaultControllerType,
+                           AIBehaviorMode defaultBehaviorMode) {
         this.plugin = plugin;
         this.economyService = economyService;
+        this.defaultControllerType = defaultControllerType;
+        this.defaultBehaviorMode = defaultBehaviorMode;
     }
 
     public synchronized AIPlayerProfile createProfile(String name, Location location) {
@@ -36,7 +41,7 @@ public class AIPlayerManager {
             return null;
         }
         UUID uuid = UUID.nameUUIDFromBytes(("AI-" + name).getBytes());
-        AIPlayerProfile profile = new AIPlayerProfile(uuid, name, AIControllerType.DUMMY, AIBehaviorMode.WANDER, location.clone());
+        AIPlayerProfile profile = new AIPlayerProfile(uuid, name, defaultControllerType, defaultBehaviorMode, location.clone());
         profiles.put(name, profile);
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Created AI player profile for " + name);

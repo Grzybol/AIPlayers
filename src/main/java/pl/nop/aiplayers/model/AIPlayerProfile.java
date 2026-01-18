@@ -1,6 +1,9 @@
 package pl.nop.aiplayers.model;
 
 import org.bukkit.Location;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class AIPlayerProfile {
@@ -10,6 +13,7 @@ public class AIPlayerProfile {
     private AIControllerType controllerType;
     private AIBehaviorMode behaviorMode;
     private Location lastKnownLocation;
+    private final Map<String, String> metadata;
 
     public AIPlayerProfile(UUID uuid, String name, AIControllerType controllerType, AIBehaviorMode behaviorMode, Location lastKnownLocation) {
         this.uuid = uuid;
@@ -17,6 +21,7 @@ public class AIPlayerProfile {
         this.controllerType = controllerType;
         this.behaviorMode = behaviorMode;
         this.lastKnownLocation = lastKnownLocation;
+        this.metadata = new HashMap<>();
     }
 
     public UUID getUuid() {
@@ -49,5 +54,9 @@ public class AIPlayerProfile {
 
     public void setLastKnownLocation(Location lastKnownLocation) {
         this.lastKnownLocation = lastKnownLocation;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
     }
 }

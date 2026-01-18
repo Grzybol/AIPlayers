@@ -1,5 +1,8 @@
 ai:
   tick-interval-ticks: 10
+  action-queue-size: 5
+  action-timeout-millis: 4000
+  action-cooldown-millis: 500
   default:
     behavior-mode: WANDER
     controller-type: DUMMY
@@ -13,5 +16,10 @@ ai:
     model: "gpt-4.1-mini"
 chat:
   history-size: 20
+  rate-limit-millis: 3000
 economy:
   enabled: true
+planner:
+  enabled: false
+  interval-seconds: 120
+  base-url: "http://localhost:8082/ai/plan"
