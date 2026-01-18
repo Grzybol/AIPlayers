@@ -48,6 +48,15 @@ public class AIPlayerManager {
         return profile;
     }
 
+    public synchronized void addProfile(AIPlayerProfile profile) {
+        if (profile == null || profiles.containsKey(profile.getName())) {
+            return;
+        }
+        profiles.put(profile.getName(), profile);
+        economyService.createIfPossible(profile);
+        plugin.getLogger().info("Loaded AI player profile for " + profile.getName());
+    }
+
     public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation) {
         AIPlayerProfile profile = profiles.get(name);
         if (profile == null) {
