@@ -49,11 +49,12 @@ public class AIPlayersPlugin extends JavaPlugin {
                 config.getLong("ai.action-timeout-millis", 4000L),
                 config.getLong("ai.action-cooldown-millis", 500L));
 
+        DummyAIController dummyController = new DummyAIController();
         this.controllerRegistry = new AIControllerRegistry();
         this.controllerRegistry.registerDefaults(
-                new DummyAIController(),
-                new HttpAIController(this, config),
-                new OpenAIAIController(this, config, new DummyAIController())
+                dummyController,
+                new HttpAIController(this, config, dummyController),
+                new OpenAIAIController(this, config, dummyController)
         );
 
         loadProfiles();

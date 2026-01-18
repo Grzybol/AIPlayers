@@ -26,10 +26,10 @@ The `AITickTask` runs at the configured interval, building a perception snapshot
 `AIChatService` formats broadcast messages to mimic player chat and retains a bounded history that controllers can consume. The chat listener records human chat to populate this context.
 
 ## Economy integration
-`AIEconomyService` hooks into Vault when present, creating accounts for AI players and exposing balance, deposit, and withdrawal helpers so controllers can react to server economies.
+`AIEconomyService` hooks into Vault when present, creating accounts for AI players using their UUID-backed offline player identity and exposing balance, deposit, and withdrawal helpers so controllers can react to server economies.
 
 ## Configuration
-`config.yml` controls tick intervals, default controller/behavior, and integration toggles:
+`config.yml` controls tick intervals, default controller/behavior, and integration toggles. The HTTP controller supports cooldowns and simple retries, and it sends richer perception data (balance, chat, inventory, nearby players) to the remote service:
 
 ```yaml
 ai:
@@ -41,6 +41,8 @@ ai:
     enabled: true
     base-url: "http://localhost:8081/ai/decision"
     timeout-millis: 500
+    cooldown-millis: 1000
+    retry-count: 1
   openai:
     enabled: false
     api-key: "CHANGE_ME"
