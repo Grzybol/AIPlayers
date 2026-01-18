@@ -5,6 +5,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import pl.nop.aiplayers.ai.Action;
+import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.ai.Perception;
 import pl.nop.aiplayers.ai.controller.AIController;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
@@ -25,14 +26,16 @@ public class AITickTask extends BukkitRunnable {
     private final AIControllerRegistry controllerRegistry;
     private final AIEconomyService economyService;
     private final AIChatService chatService;
+    private final ActionExecutor actionExecutor;
 
     public AITickTask(pl.nop.aiplayers.AIPlayersPlugin plugin, AIPlayerManager manager, AIControllerRegistry controllerRegistry,
-                      AIEconomyService economyService, AIChatService chatService) {
+                      AIEconomyService economyService, AIChatService chatService, ActionExecutor actionExecutor) {
         this.plugin = plugin;
         this.manager = manager;
         this.controllerRegistry = controllerRegistry;
         this.economyService = economyService;
         this.chatService = chatService;
+        this.actionExecutor = actionExecutor;
     }
 
     @Override
@@ -42,6 +45,7 @@ public class AITickTask extends BukkitRunnable {
             if (npc.getLocation() == null) {
                 continue;
             }
+            actionExecutor.tick(session);
             Perception perception = buildPerception(session);
             AIController controller = controllerRegistry.getController(session.getProfile().getControllerType());
             CompletableFuture<Action> future = controller.decide(session, perception);
@@ -49,7 +53,7 @@ public class AITickTask extends BukkitRunnable {
                 if (action == null) {
                     return;
                 }
-                Bukkit.getScheduler().runTask(plugin, () -> applyAction(session, action));
+                Bukkit.getScheduler().runTask(plugin, () -> actionExecutor.submit(session, action));
             });
         }
     }
@@ -90,38 +94,5 @@ public class AITickTask extends BukkitRunnable {
         return summary;
     }
 
-    private void applyAction(AIPlayerSession session, Action action) {
-        NPCHandle npc = session.getNpcHandle();
-        switch (action.getType()) {
-            case MOVE_TO:
-                if (action.getTargetLocation() != null) {
-                    npc.moveTo(action.getTargetLocation());
-                }
-                break;
-            case FOLLOW_PLAYER:
-                if (action.getTargetPlayer() != null && !action.getTargetPlayer().isEmpty()) {
-                    Player target = Bukkit.getPlayerExact(action.getTargetPlayer());
-                    if (target != null && target.getLocation().getWorld().equals(npc.getLocation().getWorld())) {
-                        Location targetLoc = target.getLocation().clone();
-                        targetLoc.setY(npc.getLocation().getY());
-                        npc.moveTo(targetLoc);
-                    }
-                }
-                break;
-            case SAY:
-                if (action.getMessage() != null) {
-                    chatService.sendChatMessage(session, action.getMessage());
-                }
-                break;
-            case BUY_ITEM:
-                // TODO integrate with shops
-                break;
-            case SELL_ITEM:
-                // TODO integrate with shops
-                break;
-            default:
-                break;
-        }
-        session.getProfile().setLastKnownLocation(npc.getLocation());
-    }
+    // Action execution handled by ActionExecutor
 }

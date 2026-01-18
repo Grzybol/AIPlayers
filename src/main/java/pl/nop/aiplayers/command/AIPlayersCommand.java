@@ -86,10 +86,11 @@ public class AIPlayersCommand implements CommandExecutor {
         }
         sender.sendMessage(ChatColor.GOLD + "AI Players:");
         for (AIPlayerSession session : manager.getAllSessions()) {
-            String msg = String.format("- %s at %s (controller: %s)",
+            String msg = String.format("- %s at %s (controller: %s, behavior: %s)",
                     session.getProfile().getName(),
                     session.getNpcHandle().getLocation().getWorld().getName() + " " + session.getNpcHandle().getLocation().getBlockX() + "," + session.getNpcHandle().getLocation().getBlockY() + "," + session.getNpcHandle().getLocation().getBlockZ(),
-                    session.getProfile().getControllerType().name());
+                    session.getProfile().getControllerType().name(),
+                    session.getProfile().getBehaviorMode().name());
             sender.sendMessage(ChatColor.YELLOW + msg);
         }
     }
