@@ -2,6 +2,7 @@ package pl.nop.aiplayers.economy;
 
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import pl.nop.aiplayers.model.AIPlayerProfile;
@@ -44,8 +45,9 @@ public class AIEconomyService {
         if (!isAvailable()) {
             return;
         }
-        if (!economy.hasAccount(profile.getName())) {
-            economy.createPlayerAccount(profile.getName());
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(profile.getUuid());
+        if (!economy.hasAccount(offlinePlayer)) {
+            economy.createPlayerAccount(offlinePlayer);
         }
     }
 
@@ -53,12 +55,12 @@ public class AIEconomyService {
         if (!isAvailable()) {
             return 0;
         }
-        return economy.getBalance(profile.getName());
+        return economy.getBalance(Bukkit.getOfflinePlayer(profile.getUuid()));
     }
 
     public void deposit(AIPlayerProfile profile, double amount) {
         if (isAvailable()) {
-            economy.depositPlayer(profile.getName(), amount);
+            economy.depositPlayer(Bukkit.getOfflinePlayer(profile.getUuid()), amount);
         }
     }
 
@@ -66,6 +68,6 @@ public class AIEconomyService {
         if (!isAvailable()) {
             return false;
         }
-        return economy.withdrawPlayer(profile.getName(), amount).transactionSuccess();
+        return economy.withdrawPlayer(Bukkit.getOfflinePlayer(profile.getUuid()), amount).transactionSuccess();
     }
 }
