@@ -105,14 +105,14 @@ public class HttpAIController implements AIController {
                             return sendWithRetry(payload, current, retriesLeft - 1);
                         }
                         plugin.getLogger().warning("HTTP AI error: " + ex.getMessage());
-                        return CompletableFuture.completedFuture(null);
+                        return CompletableFuture.<Action>completedFuture(null);
                     }
                     if (response.statusCode() != 200) {
                         if (retriesLeft > 0) {
                             plugin.getLogger().warning("HTTP controller returned status " + response.statusCode() + ", retrying...");
                             return sendWithRetry(payload, current, retriesLeft - 1);
                         }
-                        return CompletableFuture.completedFuture(null);
+                        return CompletableFuture.<Action>completedFuture(null);
                     }
                     JsonObject json = gson.fromJson(response.body(), JsonObject.class);
                     return CompletableFuture.completedFuture(parseAction(json, current));
