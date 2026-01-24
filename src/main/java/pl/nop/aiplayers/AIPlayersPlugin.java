@@ -6,8 +6,6 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
 import pl.nop.aiplayers.ai.controller.DummyAIController;
-import pl.nop.aiplayers.ai.controller.HttpAIController;
-import pl.nop.aiplayers.ai.controller.OpenAIAIController;
 import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.chat.AIChatListener;
 import pl.nop.aiplayers.chat.AIChatService;
@@ -51,11 +49,7 @@ public class AIPlayersPlugin extends JavaPlugin {
 
         DummyAIController dummyController = new DummyAIController();
         this.controllerRegistry = new AIControllerRegistry();
-        this.controllerRegistry.registerDefaults(
-                dummyController,
-                new HttpAIController(this, config, dummyController),
-                new OpenAIAIController(this, config, dummyController)
-        );
+        this.controllerRegistry.registerDefaults(dummyController);
 
         loadProfiles();
         registerCommands();

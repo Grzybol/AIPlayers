@@ -22,13 +22,5 @@ mvn test
 mvn test
 ```
 
-## Konfiguracja OpenAI
-Projekt nie korzysta z pliku `.env`. Klucz OpenAI ustawiany jest w `config.yml` jako wartość `ai.openai.api-key` i wymaga włączenia `ai.openai.enabled`. Przykład:
-
-```yaml
-ai:
-  openai:
-    enabled: true
-    api-key: "WSTAW_KLUCZ_OPENAI"
-    model: "gpt-4.1-mini"
-```
+## Tryb lokalny
+Plugin działa wyłącznie lokalnie i nie komunikuje się z żadnymi zewnętrznymi usługami AI. Wszystkie decyzje są podejmowane przez wbudowany kontroler `DUMMY`, którego zachowanie można dostosować przez ustawienia w `config.yml`.

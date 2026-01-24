@@ -9,10 +9,8 @@ public class AIControllerRegistry {
 
     private final Map<AIControllerType, AIController> controllers = new EnumMap<>(AIControllerType.class);
 
-    public void registerDefaults(DummyAIController dummy, HttpAIController http, OpenAIAIController openai) {
+    public void registerDefaults(DummyAIController dummy) {
         controllers.put(AIControllerType.DUMMY, dummy);
-        controllers.put(AIControllerType.HTTP, http);
-        controllers.put(AIControllerType.OPENAI, openai);
     }
 
     public void register(AIControllerType type, AIController controller) {
