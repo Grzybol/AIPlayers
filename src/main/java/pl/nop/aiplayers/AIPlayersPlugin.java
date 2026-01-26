@@ -6,6 +6,8 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
 import pl.nop.aiplayers.ai.controller.DummyAIController;
+import pl.nop.aiplayers.ai.controller.RemotePlannerAIController;
+import pl.nop.aiplayers.ai.controller.RemotePlannerConfig;
 import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.chat.AIChatListener;
 import pl.nop.aiplayers.chat.AIChatService;
@@ -50,6 +52,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20));
         this.controllerRegistry = new AIControllerRegistry();
         this.controllerRegistry.registerDefaults(dummyController);
+        registerRemoteController(config);
 
         loadProfiles();
         registerCommands();
@@ -103,6 +106,19 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     public AIPlayerStorage getStorage() {
         return storage;
+    }
+
+    private void registerRemoteController(FileConfiguration config) {
+        RemotePlannerConfig remoteConfig = new RemotePlannerConfig(config);
+        if (!remoteConfig.isEnabled()) {
+            return;
+        }
+        if (remoteConfig.getBaseUrl() == null || remoteConfig.getBaseUrl().isBlank()) {
+            getLogger().warning("Remote planner enabled but base-url is empty. Skipping REMOTE controller registration.");
+            return;
+        }
+        RemotePlannerAIController remoteController = new RemotePlannerAIController(this, chatService, aiPlayerManager, remoteConfig);
+        controllerRegistry.register(AIControllerType.REMOTE, remoteController);
     }
 
     private void loadProfiles() {
