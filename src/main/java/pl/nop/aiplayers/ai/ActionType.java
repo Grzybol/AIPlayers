@@ -5,6 +5,7 @@ public enum ActionType {
     SAY,
     IDLE,
     FOLLOW_PLAYER,
+    LOOK_AT,
     BUY_ITEM,
     SELL_ITEM,
     CUSTOM

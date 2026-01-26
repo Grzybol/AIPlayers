@@ -8,6 +8,7 @@ ai:
     controller-type: DUMMY
 chat:
   history-size: 20
+  memory-size: 20
   rate-limit-millis: 3000
 economy:
   enabled: true

@@ -47,6 +47,19 @@ public class AIPlayerStorage {
                 config.set(basePath + ".location.yaw", location.getYaw());
                 config.set(basePath + ".location.pitch", location.getPitch());
             }
+            Location spawnLocation = profile.getSpawnLocation();
+            if (spawnLocation != null && spawnLocation.getWorld() != null) {
+                config.set(basePath + ".spawn.world", spawnLocation.getWorld().getName());
+                config.set(basePath + ".spawn.x", spawnLocation.getX());
+                config.set(basePath + ".spawn.y", spawnLocation.getY());
+                config.set(basePath + ".spawn.z", spawnLocation.getZ());
+                config.set(basePath + ".spawn.yaw", spawnLocation.getYaw());
+                config.set(basePath + ".spawn.pitch", spawnLocation.getPitch());
+            }
+            config.set(basePath + ".roam-radius", profile.getRoamRadius());
+            if (profile.getChatInstruction() != null) {
+                config.set(basePath + ".chat-instruction", profile.getChatInstruction());
+            }
             if (!profile.getMetadata().isEmpty()) {
                 config.createSection(basePath + ".metadata", profile.getMetadata());
             }
@@ -77,7 +90,14 @@ public class AIPlayerStorage {
             AIControllerType controllerType = parseControllerType(config.getString(basePath + ".controller"));
             AIBehaviorMode behaviorMode = parseBehaviorMode(config.getString(basePath + ".behavior"));
             Location location = loadLocation(config.getConfigurationSection(basePath + ".location"));
-            AIPlayerProfile profile = new AIPlayerProfile(UUID.fromString(uuidString), name, controllerType, behaviorMode, location);
+            Location spawnLocation = loadLocation(config.getConfigurationSection(basePath + ".spawn"));
+            if (spawnLocation == null) {
+                spawnLocation = location == null ? null : location.clone();
+            }
+            double roamRadius = config.getDouble(basePath + ".roam-radius", 6.0);
+            String chatInstruction = config.getString(basePath + ".chat-instruction", "");
+            AIPlayerProfile profile = new AIPlayerProfile(UUID.fromString(uuidString), name, controllerType, behaviorMode,
+                    location, spawnLocation, roamRadius, chatInstruction);
             ConfigurationSection metadataSection = config.getConfigurationSection(basePath + ".metadata");
             if (metadataSection != null) {
                 for (Map.Entry<String, Object> entry : metadataSection.getValues(false).entrySet()) {

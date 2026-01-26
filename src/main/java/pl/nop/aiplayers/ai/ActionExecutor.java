@@ -89,6 +89,11 @@ public class ActionExecutor {
                     chatService.sendChatMessage(session, action.getMessage());
                 }
                 break;
+            case LOOK_AT:
+                if (action.getTargetLocation() != null) {
+                    npc.lookAt(action.getTargetLocation());
+                }
+                break;
             case BUY_ITEM:
             case SELL_ITEM:
             case CUSTOM:

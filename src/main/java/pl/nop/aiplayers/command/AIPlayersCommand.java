@@ -54,18 +54,30 @@ public class AIPlayersCommand implements CommandExecutor {
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.RED + "Usage: /aiplayers add <name>");
+            sender.sendMessage(ChatColor.RED + "Usage: /aiplayers add <name> <radius> '<chat instruction>'");
+            return;
+        }
+        if (args.length < 4) {
+            sender.sendMessage(ChatColor.RED + "Usage: /aiplayers add <name> <radius> '<chat instruction>'");
             return;
         }
         String name = args[1];
+        double radius;
+        try {
+            radius = Double.parseDouble(args[2]);
+        } catch (NumberFormatException ex) {
+            sender.sendMessage(ChatColor.RED + "Radius must be a number.");
+            return;
+        }
+        String instruction = parseInstruction(args, 3);
         Player player = (Player) sender;
         Location loc = player.getLocation();
         if (manager.getProfile(name) != null) {
             sender.sendMessage(ChatColor.RED + "AI player with that name already exists.");
             return;
         }
-        manager.createProfile(name, loc);
-        manager.spawnAIPlayer(name, loc);
+        manager.createProfile(name, loc, radius, instruction);
+        manager.spawnAIPlayer(name, loc, radius, instruction);
         sender.sendMessage(ChatColor.GREEN + "Spawned AI player " + name + ".");
     }
 
@@ -111,5 +123,20 @@ public class AIPlayersCommand implements CommandExecutor {
             return;
         }
         ((Player) sender).openInventory(session.getInventory());
+    }
+
+    private String parseInstruction(String[] args, int startIndex) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = startIndex; i < args.length; i++) {
+            if (i > startIndex) {
+                builder.append(' ');
+            }
+            builder.append(args[i]);
+        }
+        String raw = builder.toString().trim();
+        if (raw.startsWith("'") && raw.endsWith("'") && raw.length() > 1) {
+            return raw.substring(1, raw.length() - 1);
+        }
+        return raw;
     }
 }
