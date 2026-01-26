@@ -37,6 +37,10 @@ public class Action {
         return new Action(ActionType.FOLLOW_PLAYER, null, null, playerName, null, 0, 0);
     }
 
+    public static Action lookAt(Location location) {
+        return new Action(ActionType.LOOK_AT, location, null, null, null, 0, 0);
+    }
+
     public static Action buy(String itemId, int amount, double price) {
         return new Action(ActionType.BUY_ITEM, null, null, null, itemId, amount, price);
     }

@@ -47,7 +47,7 @@ public class AIPlayersPlugin extends JavaPlugin {
                 config.getLong("ai.action-timeout-millis", 4000L),
                 config.getLong("ai.action-cooldown-millis", 500L));
 
-        DummyAIController dummyController = new DummyAIController();
+        DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20));
         this.controllerRegistry = new AIControllerRegistry();
         this.controllerRegistry.registerDefaults(dummyController);
 

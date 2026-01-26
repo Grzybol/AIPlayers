@@ -36,12 +36,13 @@ public class AIPlayerManager {
         this.defaultBehaviorMode = defaultBehaviorMode;
     }
 
-    public synchronized AIPlayerProfile createProfile(String name, Location location) {
+    public synchronized AIPlayerProfile createProfile(String name, Location location, double roamRadius, String chatInstruction) {
         if (profiles.containsKey(name)) {
             return null;
         }
         UUID uuid = UUID.nameUUIDFromBytes(("AI-" + name).getBytes());
-        AIPlayerProfile profile = new AIPlayerProfile(uuid, name, defaultControllerType, defaultBehaviorMode, location.clone());
+        AIPlayerProfile profile = new AIPlayerProfile(uuid, name, defaultControllerType, defaultBehaviorMode,
+                location.clone(), location.clone(), roamRadius, chatInstruction);
         profiles.put(name, profile);
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Created AI player profile for " + name);
@@ -57,10 +58,10 @@ public class AIPlayerManager {
         plugin.getLogger().info("Loaded AI player profile for " + profile.getName());
     }
 
-    public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation) {
+    public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation, double roamRadius, String chatInstruction) {
         AIPlayerProfile profile = profiles.get(name);
         if (profile == null) {
-            profile = createProfile(name, spawnLocation);
+            profile = createProfile(name, spawnLocation, roamRadius, chatInstruction);
             if (profile == null) {
                 return null;
             }
@@ -68,6 +69,9 @@ public class AIPlayerManager {
         if (sessions.containsKey(name)) {
             return sessions.get(name);
         }
+        profile.setSpawnLocation(spawnLocation.clone());
+        profile.setRoamRadius(roamRadius);
+        profile.setChatInstruction(chatInstruction);
         profile.setLastKnownLocation(spawnLocation.clone());
         NPCHandle npcHandle = new ProtocolLibNPCHandle(plugin, profile.getUuid(), profile.getName());
         npcHandle.spawn(spawnLocation);
