@@ -62,12 +62,14 @@ public class RemotePlannerAIController implements AIController {
         logToFile("Sending planner request " + request.requestId + " to " + targetUrl
                 + " for bot=" + session.getProfile().getName()
                 + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()));
+        logToFile("Planner request " + request.requestId + " payload: " + payload);
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
                 .build();
+        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json");
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
@@ -75,11 +77,13 @@ public class RemotePlannerAIController implements AIController {
                         plugin.getLogger().warning("Planner API responded with status " + response.statusCode());
                         logToFile("Planner API responded with status " + response.statusCode()
                                 + " for request " + request.requestId);
+                        logToFile("Planner response " + request.requestId + " payload: " + response.body());
                         return null;
                     }
                     logToFile("Planner API responded with status " + response.statusCode()
                             + " for request " + request.requestId
                             + ", payloadLength=" + response.body().length());
+                    logToFile("Planner response " + request.requestId + " payload: " + response.body());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenCompose(response -> toActionFuture(session, response))
