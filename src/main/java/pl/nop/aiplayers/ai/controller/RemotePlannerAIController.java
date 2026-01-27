@@ -4,9 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
+import pl.nop.aiplayers.AIPlayersPlugin;
 import pl.nop.aiplayers.ai.Action;
 import pl.nop.aiplayers.ai.Perception;
 import pl.nop.aiplayers.chat.AIChatService;
+import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIPlayerProfile;
 import pl.nop.aiplayers.model.AIPlayerSession;
@@ -51,11 +53,17 @@ public class RemotePlannerAIController implements AIController {
         }
         PlannerRequest request = buildRequest(session, perception);
         if (request == null) {
+            logToFile("Planner request skipped: missing base URL for bot " + session.getProfile().getName());
             return CompletableFuture.completedFuture(Action.idle());
         }
         String payload = gson.toJson(request);
+        String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        plugin.getLogger().info("Sending chat request to the server " + targetUrl + " for AIPlayer " + session.getProfile().getName());
+        logToFile("Sending planner request " + request.requestId + " to " + targetUrl
+                + " for bot=" + session.getProfile().getName()
+                + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()));
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(config.getBaseUrl() + config.getPlanPath()))
+                .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
@@ -65,13 +73,19 @@ public class RemotePlannerAIController implements AIController {
                 .thenApply(response -> {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Planner API responded with status " + response.statusCode());
+                        logToFile("Planner API responded with status " + response.statusCode()
+                                + " for request " + request.requestId);
                         return null;
                     }
+                    logToFile("Planner API responded with status " + response.statusCode()
+                            + " for request " + request.requestId
+                            + ", payloadLength=" + response.body().length());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenCompose(response -> toActionFuture(session, response))
                 .exceptionally(ex -> {
                     plugin.getLogger().warning("Planner API request failed: " + ex.getMessage());
+                    logToFile("Planner API request failed for " + request.requestId + ": " + ex.getMessage());
                     return Action.idle();
                 });
     }
@@ -86,10 +100,13 @@ public class RemotePlannerAIController implements AIController {
                 .findFirst()
                 .orElse(null);
         if (planned == null || planned.message == null || planned.message.isBlank()) {
+            logToFile("Planner response contained no chat action for bot " + session.getProfile().getName());
             return CompletableFuture.completedFuture(Action.idle());
         }
         long delay = Math.max(0, planned.sendAfterMs);
         Action action = Action.say(planned.message);
+        logToFile("Planner response action for bot " + session.getProfile().getName()
+                + ": message='" + planned.message + "', sendAfterMs=" + planned.sendAfterMs);
         if (delay <= 0) {
             return CompletableFuture.completedFuture(action);
         }
@@ -189,6 +206,20 @@ public class RemotePlannerAIController implements AIController {
             chatLines.add(line);
         }
         return chatLines;
+    }
+
+    private void logToFile(String message) {
+        AIPlayersFileLogger fileLogger = getFileLogger();
+        if (fileLogger != null) {
+            fileLogger.info(message);
+        }
+    }
+
+    private AIPlayersFileLogger getFileLogger() {
+        if (plugin instanceof AIPlayersPlugin) {
+            return ((AIPlayersPlugin) plugin).getFileLogger();
+        }
+        return null;
     }
 
     private static class PlannerRequest {

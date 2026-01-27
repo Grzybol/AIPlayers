@@ -4,7 +4,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
+import pl.nop.aiplayers.AIPlayersPlugin;
 import pl.nop.aiplayers.economy.AIEconomyService;
+import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.model.AIBehaviorMode;
 import pl.nop.aiplayers.model.AIControllerType;
 import pl.nop.aiplayers.model.AIPlayerProfile;
@@ -46,6 +48,7 @@ public class AIPlayerManager {
         profiles.put(name, profile);
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Created AI player profile for " + name);
+        logToFile("Created AI player profile for " + name + " (uuid=" + uuid + ")");
         return profile;
     }
 
@@ -56,6 +59,7 @@ public class AIPlayerManager {
         profiles.put(profile.getName(), profile);
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Loaded AI player profile for " + profile.getName());
+        logToFile("Loaded AI player profile for " + profile.getName() + " (uuid=" + profile.getUuid() + ")");
     }
 
     public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation, double roamRadius, String chatInstruction) {
@@ -80,6 +84,7 @@ public class AIPlayerManager {
         AIPlayerSession session = new AIPlayerSession(profile, npcHandle, inventory, enderChest);
         sessions.put(name, session);
         plugin.getLogger().info("Spawned AI player " + name + " at " + locationToString(spawnLocation));
+        logToFile("Spawned AI player " + name + " at " + locationToString(spawnLocation));
         return session;
     }
 
@@ -88,12 +93,14 @@ public class AIPlayerManager {
         if (session != null) {
             session.getNpcHandle().despawn();
             plugin.getLogger().info("Despawned AI player " + name);
+            logToFile("Despawned AI player " + name);
         }
     }
 
     public synchronized void removeAIPlayer(String name) {
         despawnAIPlayer(name);
         profiles.remove(name);
+        logToFile("Removed AI player profile " + name);
     }
 
     public synchronized AIPlayerProfile getProfile(String name) {
@@ -128,5 +135,19 @@ public class AIPlayerManager {
 
     private String locationToString(Location location) {
         return String.format("%s (%.1f, %.1f, %.1f)", location.getWorld().getName(), location.getX(), location.getY(), location.getZ());
+    }
+
+    private void logToFile(String message) {
+        AIPlayersFileLogger fileLogger = getFileLogger();
+        if (fileLogger != null) {
+            fileLogger.info(message);
+        }
+    }
+
+    private AIPlayersFileLogger getFileLogger() {
+        if (plugin instanceof AIPlayersPlugin) {
+            return ((AIPlayersPlugin) plugin).getFileLogger();
+        }
+        return null;
     }
 }

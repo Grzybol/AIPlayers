@@ -3,6 +3,8 @@ package pl.nop.aiplayers.chat;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.Plugin;
+import pl.nop.aiplayers.AIPlayersPlugin;
+import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.model.AIPlayerSession;
 
 import java.util.ArrayDeque;
@@ -33,6 +35,7 @@ public class AIChatService {
             chatHistory.removeFirst();
         }
         chatHistory.addLast(ChatEntry.fromLine(message, System.currentTimeMillis()));
+        logToFile("Recorded chat message: " + message);
     }
 
     public synchronized List<String> getChatHistorySnapshot() {
@@ -64,6 +67,21 @@ public class AIChatService {
         String formatted = ChatColor.GRAY + "<" + session.getProfile().getName() + "> " + ChatColor.WHITE + message;
         Bukkit.broadcastMessage(formatted);
         recordMessage(session.getProfile().getName() + ": " + message);
+        logToFile("AIPlayer " + session.getProfile().getName() + " sent chat message: " + message);
+    }
+
+    private void logToFile(String message) {
+        AIPlayersFileLogger fileLogger = getFileLogger();
+        if (fileLogger != null) {
+            fileLogger.info(message);
+        }
+    }
+
+    private AIPlayersFileLogger getFileLogger() {
+        if (plugin instanceof AIPlayersPlugin) {
+            return ((AIPlayersPlugin) plugin).getFileLogger();
+        }
+        return null;
     }
 
     public static class ChatEntry {

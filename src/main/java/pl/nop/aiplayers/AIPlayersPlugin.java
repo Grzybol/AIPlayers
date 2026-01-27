@@ -14,6 +14,7 @@ import pl.nop.aiplayers.chat.AIChatService;
 import pl.nop.aiplayers.command.AIPlayersCommand;
 import pl.nop.aiplayers.command.AIPlayersTabCompleter;
 import pl.nop.aiplayers.economy.AIEconomyService;
+import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIBehaviorMode;
 import pl.nop.aiplayers.model.AIControllerType;
@@ -28,11 +29,13 @@ public class AIPlayersPlugin extends JavaPlugin {
     private AIEconomyService economyService;
     private AIPlayerStorage storage;
     private ActionExecutor actionExecutor;
+    private AIPlayersFileLogger fileLogger;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         FileConfiguration config = getConfig();
+        this.fileLogger = new AIPlayersFileLogger(this);
 
         this.chatService = new AIChatService(this,
                 config.getInt("chat.history-size", 20),
@@ -60,6 +63,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         startTickTask();
 
         getLogger().info("AIPlayers enabled with tick interval " + config.getInt("ai.tick-interval-ticks", 10));
+        fileLogger.info("AIPlayers enabled. Logging to " + fileLogger.getCurrentLogFile());
     }
 
     private void registerCommands() {
@@ -86,6 +90,9 @@ public class AIPlayersPlugin extends JavaPlugin {
         storage.saveAll(aiPlayerManager.getAllProfiles());
         aiPlayerManager.despawnAll();
         getLogger().info("AIPlayers disabled");
+        if (fileLogger != null) {
+            fileLogger.info("AIPlayers disabled.");
+        }
     }
 
     public AIPlayerManager getAiPlayerManager() {
@@ -94,6 +101,10 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     public AIChatService getChatService() {
         return chatService;
+    }
+
+    public AIPlayersFileLogger getFileLogger() {
+        return fileLogger;
     }
 
     public AIControllerRegistry getControllerRegistry() {
