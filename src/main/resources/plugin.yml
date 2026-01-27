@@ -5,6 +5,7 @@ api-version: 1.18
 author: "nop"
 description: "AI-controlled player-like agents with inventory, chat and economy."
 softdepend:
+  - Essentials
   - ProtocolLib
   - Vault
 commands:
