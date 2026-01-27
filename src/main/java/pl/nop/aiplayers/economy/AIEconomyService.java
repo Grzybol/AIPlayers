@@ -4,6 +4,7 @@ import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import pl.nop.aiplayers.model.AIPlayerProfile;
 
@@ -38,7 +39,7 @@ public class AIEconomyService {
     }
 
     public boolean isAvailable() {
-        return economy != null;
+        return economy != null && isEconomyProviderReady();
     }
 
     public void createIfPossible(AIPlayerProfile profile) {
@@ -69,5 +70,17 @@ public class AIEconomyService {
             return false;
         }
         return economy.withdrawPlayer(Bukkit.getOfflinePlayer(profile.getUuid()), amount).transactionSuccess();
+    }
+
+    private boolean isEconomyProviderReady() {
+        if (economy == null) {
+            return false;
+        }
+        String economyName = economy.getName();
+        if (economyName == null || !economyName.toLowerCase().contains("essentials")) {
+            return true;
+        }
+        Plugin essentials = plugin.getServer().getPluginManager().getPlugin("Essentials");
+        return essentials == null || essentials.isEnabled();
     }
 }
