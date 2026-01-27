@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 public class RemotePlannerAIController implements AIController {
@@ -34,6 +35,7 @@ public class RemotePlannerAIController implements AIController {
     private final Gson gson;
     private final HttpClient httpClient;
     private final RemotePlannerConfig config;
+    private final ConcurrentHashMap<UUID, Long> lastRequestMillis;
 
     public RemotePlannerAIController(Plugin plugin, AIChatService chatService, AIPlayerManager manager, RemotePlannerConfig config) {
         this.plugin = plugin;
@@ -44,11 +46,15 @@ public class RemotePlannerAIController implements AIController {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(config.getRequestTimeout())
                 .build();
+        this.lastRequestMillis = new ConcurrentHashMap<>();
     }
 
     @Override
     public CompletableFuture<Action> decide(AIPlayerSession session, Perception perception) {
         if (!config.isEnabled()) {
+            return CompletableFuture.completedFuture(Action.idle());
+        }
+        if (!shouldSendRequest(session)) {
             return CompletableFuture.completedFuture(Action.idle());
         }
         PlannerRequest request = buildRequest(session, perception);
@@ -92,6 +98,20 @@ public class RemotePlannerAIController implements AIController {
                     logToFile("Planner API request failed for " + request.requestId + ": " + ex.getMessage());
                     return Action.idle();
                 });
+    }
+
+    private boolean shouldSendRequest(AIPlayerSession session) {
+        UUID botId = session.getProfile().getUuid();
+        long now = System.currentTimeMillis();
+        long lastSent = lastRequestMillis.getOrDefault(botId, 0L);
+        long lastChatUpdate = chatService.getLastChatUpdateMillis();
+        boolean chatUpdated = lastChatUpdate > lastSent;
+        boolean intervalElapsed = now - lastSent >= config.getRequestIntervalMillis();
+        if (chatUpdated || intervalElapsed) {
+            lastRequestMillis.put(botId, now);
+            return true;
+        }
+        return false;
     }
 
     private CompletableFuture<Action> toActionFuture(AIPlayerSession session, PlannerResponse response) {

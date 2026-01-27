@@ -16,6 +16,7 @@ public class RemotePlannerConfig {
     private final String serverMode;
     private final PlannerSettings settings;
     private final int chatLimit;
+    private final long requestIntervalMillis;
     private final String personaLanguage;
     private final String personaTone;
     private final List<String> personaStyleTags;
@@ -30,6 +31,7 @@ public class RemotePlannerConfig {
         this.serverId = config.getString("ai.remote.server-id", "betterbox-1");
         this.serverMode = config.getString("ai.remote.server-mode", "LOBBY");
         this.chatLimit = Math.max(1, config.getInt("ai.remote.chat-limit", 10));
+        this.requestIntervalMillis = Math.max(30000L, config.getLong("ai.remote.request-interval-millis", 30000L));
         this.settings = new PlannerSettings(
                 config.getInt("ai.remote.settings.max-actions", 3),
                 config.getInt("ai.remote.settings.min-delay-ms", 800),
@@ -81,6 +83,10 @@ public class RemotePlannerConfig {
 
     public int getChatLimit() {
         return chatLimit;
+    }
+
+    public long getRequestIntervalMillis() {
+        return requestIntervalMillis;
     }
 
     public String getPersonaLanguage() {
