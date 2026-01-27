@@ -11,6 +11,7 @@ ai:
     base-url: "http://localhost:8080"
     plan-path: "/v1/plan"
     request-timeout-millis: 1500
+    request-interval-millis: 30000
     server-id: "betterbox-1"
     server-mode: "LOBBY"
     chat-limit: 10

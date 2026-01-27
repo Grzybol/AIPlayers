@@ -22,6 +22,7 @@ public class AIChatService {
     private final int maxSize;
     private final long rateLimitMillis;
     private final Map<UUID, Long> lastMessageMillis = new ConcurrentHashMap<>();
+    private volatile long lastChatUpdateMillis;
 
     public AIChatService(Plugin plugin, int maxSize, long rateLimitMillis) {
         this.plugin = plugin;
@@ -34,7 +35,9 @@ public class AIChatService {
         if (chatHistory.size() >= maxSize) {
             chatHistory.removeFirst();
         }
-        chatHistory.addLast(ChatEntry.fromLine(message, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        chatHistory.addLast(ChatEntry.fromLine(message, now));
+        lastChatUpdateMillis = now;
         logToFile("Recorded chat message: " + message);
     }
 
@@ -68,6 +71,10 @@ public class AIChatService {
         Bukkit.broadcastMessage(formatted);
         recordMessage(session.getProfile().getName() + ": " + message);
         logToFile("AIPlayer " + session.getProfile().getName() + " sent chat message: " + message);
+    }
+
+    public long getLastChatUpdateMillis() {
+        return lastChatUpdateMillis;
     }
 
     private void logToFile(String message) {
