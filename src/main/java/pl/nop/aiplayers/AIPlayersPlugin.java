@@ -43,7 +43,16 @@ public class AIPlayersPlugin extends JavaPlugin {
         this.economyService = new AIEconomyService(this, config.getBoolean("economy.enabled", true));
         this.storage = new AIPlayerStorage(getDataFolder());
 
+        RemotePlannerConfig remoteConfig = new RemotePlannerConfig(config);
         AIControllerType defaultController = parseControllerType(config.getString("ai.default.controller-type", "DUMMY"));
+        if (remoteConfig.isEnabled() && defaultController == AIControllerType.DUMMY
+                && remoteConfig.getBaseUrl() != null && !remoteConfig.getBaseUrl().isBlank()) {
+            defaultController = AIControllerType.REMOTE;
+            String message = "Remote planner enabled with base-url; default controller set to REMOTE. "
+                    + "Set ai.default.controller-type to override.";
+            getLogger().info(message);
+            fileLogger.info(message);
+        }
         AIBehaviorMode defaultBehavior = parseBehaviorMode(config.getString("ai.default.behavior-mode", "WANDER"));
         this.aiPlayerManager = new AIPlayerManager(this, economyService, defaultController, defaultBehavior);
 
@@ -55,7 +64,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20));
         this.controllerRegistry = new AIControllerRegistry();
         this.controllerRegistry.registerDefaults(dummyController);
-        registerRemoteController(config);
+        registerRemoteController(remoteConfig);
 
         loadProfiles();
         registerCommands();
@@ -119,8 +128,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         return storage;
     }
 
-    private void registerRemoteController(FileConfiguration config) {
-        RemotePlannerConfig remoteConfig = new RemotePlannerConfig(config);
+    private void registerRemoteController(RemotePlannerConfig remoteConfig) {
         if (!remoteConfig.isEnabled()) {
             return;
         }
