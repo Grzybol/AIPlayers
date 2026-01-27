@@ -67,6 +67,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         registerRemoteController(remoteConfig);
 
         loadProfiles();
+        promoteRemoteControllerProfiles(remoteConfig, defaultController);
         registerCommands();
         registerListeners();
         startTickTask();
@@ -143,6 +144,24 @@ public class AIPlayersPlugin extends JavaPlugin {
     private void loadProfiles() {
         storage.loadAll().forEach(aiPlayerManager::addProfile);
         getLogger().info("Loaded " + aiPlayerManager.getAllProfiles().size() + " AI player profiles.");
+    }
+
+    private void promoteRemoteControllerProfiles(RemotePlannerConfig remoteConfig, AIControllerType defaultController) {
+        if (!remoteConfig.isEnabled() || defaultController != AIControllerType.REMOTE) {
+            return;
+        }
+        int updated = 0;
+        for (pl.nop.aiplayers.model.AIPlayerProfile profile : aiPlayerManager.getAllProfiles()) {
+            if (profile.getControllerType() == AIControllerType.DUMMY) {
+                profile.setControllerType(AIControllerType.REMOTE);
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            String message = "Updated " + updated + " AI player profile(s) to use REMOTE controller.";
+            getLogger().info(message);
+            fileLogger.info(message);
+        }
     }
 
     private AIControllerType parseControllerType(String value) {

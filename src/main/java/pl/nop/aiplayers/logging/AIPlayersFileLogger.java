@@ -6,23 +6,22 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class AIPlayersFileLogger {
 
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
     private final AIPlayersPlugin plugin;
     private final Path logsDirectory;
-    private LocalDate currentDate;
     private Path currentLogFile;
 
     public AIPlayersFileLogger(AIPlayersPlugin plugin) {
         this.plugin = plugin;
         this.logsDirectory = plugin.getDataFolder().toPath().resolve("logs");
+        refreshLogFile();
     }
 
     public synchronized void info(String message) {
@@ -50,10 +49,8 @@ public class AIPlayersFileLogger {
     }
 
     private void refreshLogFile() {
-        LocalDate now = LocalDate.now();
-        if (currentDate == null || !currentDate.equals(now)) {
-            currentDate = now;
-            String filename = DATE_FORMAT.format(now) + "_log.txt";
+        if (currentLogFile == null) {
+            String filename = DATE_FORMAT.format(LocalDateTime.now()) + "_log.txt";
             currentLogFile = logsDirectory.resolve(filename);
         }
     }
