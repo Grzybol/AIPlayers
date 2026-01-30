@@ -1,0 +1,19 @@
+name: AIPlayers
+main: pl.nop.aiplayers.AIPlayersPlugin
+version: 1.0.0
+api-version: 1.18
+author: "nop"
+description: "AI-controlled player-like agents with inventory, chat and economy."
+softdepend:
+  - Essentials
+  - ProtocolLib
+  - Vault
+commands:
+  aiplayers:
+    description: "Manage AI players."
+    usage: "/aiplayers <add|remove|list|inspect>"
+    permission: "aiplayers.admin"
+permissions:
+  aiplayers.admin:
+    description: "Allows managing AI players."
+    default: op

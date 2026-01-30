@@ -1,0 +1,40 @@
+ai:
+  tick-interval-ticks: 10
+  action-queue-size: 5
+  action-timeout-millis: 4000
+  action-cooldown-millis: 500
+  default:
+    behavior-mode: WANDER
+    controller-type: DUMMY
+  remote:
+    enabled: false
+    base-url: "http://localhost:8080"
+    plan-path: "/v1/plan"
+    request-timeout-millis: 1500
+    request-interval-millis: 30000
+    server-id: "betterbox-1"
+    server-mode: "LOBBY"
+    chat-limit: 10
+    settings:
+      max-actions: 3
+      min-delay-ms: 800
+      max-delay-ms: 4500
+      global-silence-chance: 0.25
+      reply-chance: 0.65
+    persona:
+      language: "pl"
+      tone: "casual"
+      style-tags:
+        - "short"
+        - "memes_light"
+      avoid-topics:
+        - "payments"
+        - "admin_powers"
+        - "cheating"
+      knowledge-level: "average_player"
+chat:
+  history-size: 20
+  memory-size: 20
+  rate-limit-millis: 3000
+economy:
+  enabled: true
