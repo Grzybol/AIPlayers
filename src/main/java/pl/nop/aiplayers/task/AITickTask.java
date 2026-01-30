@@ -10,6 +10,7 @@ import pl.nop.aiplayers.ai.Perception;
 import pl.nop.aiplayers.ai.controller.AIController;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
 import pl.nop.aiplayers.chat.AIChatService;
+import pl.nop.aiplayers.chat.engagement.ChatEngagementService;
 import pl.nop.aiplayers.economy.AIEconomyService;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIPlayerSession;
@@ -27,19 +28,25 @@ public class AITickTask extends BukkitRunnable {
     private final AIEconomyService economyService;
     private final AIChatService chatService;
     private final ActionExecutor actionExecutor;
+    private final ChatEngagementService engagementService;
 
     public AITickTask(pl.nop.aiplayers.AIPlayersPlugin plugin, AIPlayerManager manager, AIControllerRegistry controllerRegistry,
-                      AIEconomyService economyService, AIChatService chatService, ActionExecutor actionExecutor) {
+                      AIEconomyService economyService, AIChatService chatService, ActionExecutor actionExecutor,
+                      ChatEngagementService engagementService) {
         this.plugin = plugin;
         this.manager = manager;
         this.controllerRegistry = controllerRegistry;
         this.economyService = economyService;
         this.chatService = chatService;
         this.actionExecutor = actionExecutor;
+        this.engagementService = engagementService;
     }
 
     @Override
     public void run() {
+        if (engagementService != null) {
+            engagementService.tick(System.currentTimeMillis());
+        }
         for (AIPlayerSession session : manager.getAllSessions()) {
             NPCHandle npc = session.getNpcHandle();
             if (npc.getLocation() == null) {

@@ -11,6 +11,8 @@ import pl.nop.aiplayers.ai.controller.RemotePlannerConfig;
 import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.chat.AIChatListener;
 import pl.nop.aiplayers.chat.AIChatService;
+import pl.nop.aiplayers.chat.engagement.ChatEngagementConfig;
+import pl.nop.aiplayers.chat.engagement.ChatEngagementService;
 import pl.nop.aiplayers.command.AIPlayersCommand;
 import pl.nop.aiplayers.command.AIPlayersTabCompleter;
 import pl.nop.aiplayers.economy.AIEconomyService;
@@ -30,6 +32,7 @@ public class AIPlayersPlugin extends JavaPlugin {
     private AIPlayerStorage storage;
     private ActionExecutor actionExecutor;
     private AIPlayersFileLogger fileLogger;
+    private ChatEngagementService engagementService;
 
     @Override
     public void onEnable() {
@@ -60,6 +63,7 @@ public class AIPlayersPlugin extends JavaPlugin {
                 config.getInt("ai.action-queue-size", 5),
                 config.getLong("ai.action-timeout-millis", 4000L),
                 config.getLong("ai.action-cooldown-millis", 500L));
+        this.engagementService = new ChatEngagementService(this, chatService, aiPlayerManager, new ChatEngagementConfig(config));
 
         DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20));
         this.controllerRegistry = new AIControllerRegistry();
@@ -89,7 +93,7 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     private void startTickTask() {
         int interval = getConfig().getInt("ai.tick-interval-ticks", 10);
-        new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor)
+        new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor, engagementService)
                 .runTaskTimer(this, interval, interval);
     }
 

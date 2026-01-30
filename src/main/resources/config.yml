@@ -37,5 +37,14 @@ chat:
   history-size: 20
   memory-size: 20
   rate-limit-millis: 3000
+  engagement:
+    engage-players-on-chat: false
+    min-empty-chat-time-to-engage-in-seconds: 120
+    max-empty-chat-time-to-engage-in-seconds: 300
+    base-url: "http://localhost:8080"
+    engage-path: "/v1/engage"
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
+    chat-history-limit: 10
 economy:
   enabled: true
