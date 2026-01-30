@@ -128,9 +128,14 @@ public class RemotePlannerAIController implements AIController {
             return CompletableFuture.completedFuture(Action.idle());
         }
         long delay = Math.max(0, planned.sendAfterMs);
-        Action action = Action.say(planned.message);
+        String cleanedMessage = stripBotPrefix(planned.message, session.getProfile().getName());
+        if (cleanedMessage.isBlank()) {
+            logToFile("Planner response message was empty after cleanup for bot " + session.getProfile().getName());
+            return CompletableFuture.completedFuture(Action.idle());
+        }
+        Action action = Action.say(cleanedMessage);
         logToFile("Planner response action for bot " + session.getProfile().getName()
-                + ": message='" + planned.message + "', sendAfterMs=" + planned.sendAfterMs);
+                + ": message='" + cleanedMessage + "', sendAfterMs=" + planned.sendAfterMs);
         if (delay <= 0) {
             return CompletableFuture.completedFuture(action);
         }
@@ -153,22 +158,24 @@ public class RemotePlannerAIController implements AIController {
         request.server.mode = config.getServerMode();
         request.server.onlinePlayers = Bukkit.getOnlinePlayers().size();
 
+        List<AIChatService.ChatEntry> chatEntries = chatService.getChatEntriesSnapshot();
+
         BotInfo bot = new BotInfo();
         bot.botId = session.getProfile().getUuid().toString();
         bot.name = session.getProfile().getName();
         bot.online = session.getNpcHandle().getLocation() != null;
         bot.cooldownMs = 0;
-        bot.persona = buildPersona(session.getProfile());
+        bot.persona = buildPersona(session.getProfile(), detectLanguage(chatEntries));
         request.bots = Collections.singletonList(bot);
 
-        request.chat = buildChat();
+        request.chat = buildChat(chatEntries);
         request.settings = config.getSettings();
         return request;
     }
 
-    private Persona buildPersona(AIPlayerProfile profile) {
+    private Persona buildPersona(AIPlayerProfile profile, String detectedLanguage) {
         Persona persona = new Persona();
-        persona.language = config.getPersonaLanguage();
+        persona.language = detectedLanguage != null ? detectedLanguage : config.getPersonaLanguage();
         persona.tone = config.getPersonaTone();
         persona.styleTags = new ArrayList<>(config.getPersonaStyleTags());
         persona.avoidTopics = new ArrayList<>(config.getPersonaAvoidTopics());
@@ -212,9 +219,8 @@ public class RemotePlannerAIController implements AIController {
         return tags;
     }
 
-    private List<ChatLine> buildChat() {
-        List<AIChatService.ChatEntry> entries = chatService.getChatEntriesSnapshot();
-        if (entries.isEmpty()) {
+    private List<ChatLine> buildChat(List<AIChatService.ChatEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
             return Collections.emptyList();
         }
         int limit = config.getChatLimit();
@@ -226,10 +232,80 @@ public class RemotePlannerAIController implements AIController {
             line.tsMs = entry.getTimestampMillis();
             line.sender = entry.getSender();
             line.senderType = manager.getProfile(entry.getSender()) != null ? "BOT" : "PLAYER";
-            line.message = entry.getMessage();
+            line.message = sanitizeChatMessage(line.sender, line.senderType, entry.getMessage());
             chatLines.add(line);
         }
         return chatLines;
+    }
+
+    private String sanitizeChatMessage(String sender, String senderType, String message) {
+        if (message == null) {
+            return "";
+        }
+        if (!"BOT".equals(senderType)) {
+            return message;
+        }
+        return stripBotPrefix(message, sender);
+    }
+
+    private String stripBotPrefix(String message, String botName) {
+        if (message == null) {
+            return "";
+        }
+        String trimmed = message.trim();
+        if (botName == null || botName.isBlank()) {
+            return trimmed;
+        }
+        String prefix = ":" + botName + ":";
+        while (trimmed.startsWith(prefix)) {
+            trimmed = trimmed.substring(prefix.length()).trim();
+        }
+        return trimmed;
+    }
+
+    private String detectLanguage(List<AIChatService.ChatEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+        int checked = 0;
+        for (int i = entries.size() - 1; i >= 0 && checked < config.getChatLimit(); i--) {
+            AIChatService.ChatEntry entry = entries.get(i);
+            if (manager.getProfile(entry.getSender()) != null) {
+                continue;
+            }
+            String message = entry.getMessage();
+            if (message == null || message.isBlank()) {
+                continue;
+            }
+            String lower = message.toLowerCase();
+            if (containsPolishCharacters(lower) || containsPolishWords(lower)) {
+                return "pl";
+            }
+            if (containsEnglishWords(lower)) {
+                return "en";
+            }
+            checked++;
+        }
+        return null;
+    }
+
+    private boolean containsPolishCharacters(String text) {
+        return text.contains("ą") || text.contains("ć") || text.contains("ę")
+                || text.contains("ł") || text.contains("ń") || text.contains("ó")
+                || text.contains("ś") || text.contains("ż") || text.contains("ź");
+    }
+
+    private boolean containsPolishWords(String text) {
+        return text.contains("siemka") || text.contains("cześć") || text.contains("czesc")
+                || text.contains("dzięki") || text.contains("dzieki") || text.contains("proszę")
+                || text.contains("prosze") || text.contains("co tam") || text.contains("jakie")
+                || text.contains("wiadomo") || text.contains("grac");
+    }
+
+    private boolean containsEnglishWords(String text) {
+        return text.contains("hello") || text.contains("hi ") || text.contains("thanks")
+                || text.contains("what ") || text.contains("how are") || text.contains("you ")
+                || text.contains("newbie") || text.contains("learning");
     }
 
     private void logToFile(String message) {
