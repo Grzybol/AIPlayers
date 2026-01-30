@@ -44,7 +44,7 @@ public class RemotePlannerAIController implements AIController {
         this.config = config;
         this.gson = new Gson();
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(config.getRequestTimeout())
+                .connectTimeout(config.getConnectTimeout())
                 .build();
         this.lastRequestMillis = new ConcurrentHashMap<>();
     }

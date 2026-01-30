@@ -10,7 +10,8 @@ ai:
     enabled: false
     base-url: "http://localhost:8080"
     plan-path: "/v1/plan"
-    request-timeout-millis: 1500
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
     request-interval-millis: 30000
     server-id: "betterbox-1"
     server-mode: "LOBBY"

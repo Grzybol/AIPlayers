@@ -11,6 +11,7 @@ public class RemotePlannerConfig {
     private final boolean enabled;
     private final String baseUrl;
     private final String planPath;
+    private final Duration connectTimeout;
     private final Duration requestTimeout;
     private final String serverId;
     private final String serverMode;
@@ -27,7 +28,8 @@ public class RemotePlannerConfig {
         this.enabled = config.getBoolean("ai.remote.enabled", false);
         this.baseUrl = config.getString("ai.remote.base-url", "");
         this.planPath = config.getString("ai.remote.plan-path", "/v1/plan");
-        this.requestTimeout = Duration.ofMillis(config.getLong("ai.remote.request-timeout-millis", 1500L));
+        this.connectTimeout = Duration.ofMillis(config.getLong("ai.remote.connect-timeout-millis", 2000L));
+        this.requestTimeout = Duration.ofMillis(config.getLong("ai.remote.request-timeout-millis", 5000L));
         this.serverId = config.getString("ai.remote.server-id", "betterbox-1");
         this.serverMode = config.getString("ai.remote.server-mode", "LOBBY");
         this.chatLimit = Math.max(1, config.getInt("ai.remote.chat-limit", 10));
@@ -63,6 +65,10 @@ public class RemotePlannerConfig {
 
     public String getPlanPath() {
         return planPath;
+    }
+
+    public Duration getConnectTimeout() {
+        return connectTimeout;
     }
 
     public Duration getRequestTimeout() {
