@@ -23,6 +23,7 @@ public class RemotePlannerConfig {
     private final List<String> personaStyleTags;
     private final List<String> personaAvoidTopics;
     private final String personaKnowledgeLevel;
+    private final int maxBotsPerPlayerMessage;
 
     public RemotePlannerConfig(FileConfiguration config) {
         this.enabled = config.getBoolean("ai.remote.enabled", false);
@@ -34,6 +35,7 @@ public class RemotePlannerConfig {
         this.serverMode = config.getString("ai.remote.server-mode", "LOBBY");
         this.chatLimit = Math.max(1, config.getInt("ai.remote.chat-limit", 10));
         this.requestIntervalMillis = Math.max(30000L, config.getLong("ai.remote.request-interval-millis", 30000L));
+        this.maxBotsPerPlayerMessage = Math.max(1, config.getInt("ai.remote.max-bots-per-player-message", 2));
         this.settings = new PlannerSettings(
                 config.getInt("ai.remote.settings.max-actions", 3),
                 config.getInt("ai.remote.settings.min-delay-ms", 800),
@@ -113,5 +115,9 @@ public class RemotePlannerConfig {
 
     public String getPersonaKnowledgeLevel() {
         return personaKnowledgeLevel;
+    }
+
+    public int getMaxBotsPerPlayerMessage() {
+        return maxBotsPerPlayerMessage;
     }
 }

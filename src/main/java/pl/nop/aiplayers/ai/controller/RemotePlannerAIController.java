@@ -20,12 +20,16 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class RemotePlannerAIController implements AIController {
 
@@ -36,6 +40,9 @@ public class RemotePlannerAIController implements AIController {
     private final HttpClient httpClient;
     private final RemotePlannerConfig config;
     private final ConcurrentHashMap<UUID, Long> lastRequestMillis;
+    private final Object responderLock = new Object();
+    private volatile long responderSequence = -1L;
+    private volatile Set<UUID> responders = Collections.emptySet();
 
     public RemotePlannerAIController(Plugin plugin, AIChatService chatService, AIPlayerManager manager, RemotePlannerConfig config) {
         this.plugin = plugin;
@@ -102,16 +109,18 @@ public class RemotePlannerAIController implements AIController {
 
     private boolean shouldSendRequest(AIPlayerSession session) {
         UUID botId = session.getProfile().getUuid();
-        long now = System.currentTimeMillis();
         long lastSent = lastRequestMillis.getOrDefault(botId, 0L);
-        long lastChatUpdate = chatService.getLastChatUpdateMillis();
-        boolean chatUpdated = lastChatUpdate > lastSent;
-        boolean intervalElapsed = now - lastSent >= config.getRequestIntervalMillis();
-        if (chatUpdated || intervalElapsed) {
-            lastRequestMillis.put(botId, now);
-            return true;
+        long lastPlayerChatUpdate = chatService.getLastPlayerChatUpdateMillis();
+        long lastPlayerSequence = chatService.getLastPlayerChatSequence();
+        if (lastPlayerChatUpdate <= 0 || lastPlayerChatUpdate <= lastSent) {
+            return false;
         }
-        return false;
+        updateResponders(lastPlayerSequence);
+        if (!responders.contains(botId)) {
+            return false;
+        }
+        lastRequestMillis.put(botId, System.currentTimeMillis());
+        return true;
     }
 
     private CompletableFuture<Action> toActionFuture(AIPlayerSession session, PlannerResponse response) {
@@ -127,12 +136,9 @@ public class RemotePlannerAIController implements AIController {
             logToFile("Planner response contained no chat action for bot " + session.getProfile().getName());
             return CompletableFuture.completedFuture(Action.idle());
         }
-        if ("__SILENCE__".equals(planned.message)) {
-            logToFile("Planner response instructed silence for bot " + session.getProfile().getName());
-            return CompletableFuture.completedFuture(Action.idle());
-        }
         long delay = Math.max(0, planned.sendAfterMs);
         String cleanedMessage = stripBotPrefix(planned.message, session.getProfile().getName());
+        cleanedMessage = pl.nop.aiplayers.chat.ChatMessageSanitizer.sanitizeOutgoing(cleanedMessage);
         if (cleanedMessage.isBlank()) {
             logToFile("Planner response message was empty after cleanup for bot " + session.getProfile().getName());
             return CompletableFuture.completedFuture(Action.idle());
@@ -228,17 +234,20 @@ public class RemotePlannerAIController implements AIController {
             return Collections.emptyList();
         }
         int limit = config.getChatLimit();
-        int start = Math.max(0, entries.size() - limit);
         List<ChatLine> chatLines = new ArrayList<>();
-        for (int i = start; i < entries.size(); i++) {
+        for (int i = entries.size() - 1; i >= 0 && chatLines.size() < limit; i--) {
             AIChatService.ChatEntry entry = entries.get(i);
+            if (entry.getSenderType() != AIChatService.ChatSenderType.PLAYER) {
+                continue;
+            }
             ChatLine line = new ChatLine();
             line.tsMs = entry.getTimestampMillis();
             line.sender = entry.getSender();
-            line.senderType = manager.getProfile(entry.getSender()) != null ? "BOT" : "PLAYER";
+            line.senderType = "PLAYER";
             line.message = sanitizeChatMessage(line.sender, line.senderType, entry.getMessage());
             chatLines.add(line);
         }
+        Collections.reverse(chatLines);
         return chatLines;
     }
 
@@ -257,14 +266,18 @@ public class RemotePlannerAIController implements AIController {
             return "";
         }
         String trimmed = message.trim();
+        String lower = trimmed.toLowerCase();
+        if (lower.startsWith("[bot]")) {
+            trimmed = trimmed.substring(5).trim();
+        }
         if (botName == null || botName.isBlank()) {
             return trimmed;
         }
-        String prefix = ":" + botName + ":";
-        while (trimmed.startsWith(prefix)) {
-            trimmed = trimmed.substring(prefix.length()).trim();
+        String botLower = botName.toLowerCase();
+        while (trimmed.toLowerCase().startsWith(botLower + ":")) {
+            trimmed = trimmed.substring(botName.length() + 1).trim();
         }
-        return trimmed;
+        return trimmed.trim();
     }
 
     private String detectLanguage(List<AIChatService.ChatEntry> entries) {
@@ -274,7 +287,7 @@ public class RemotePlannerAIController implements AIController {
         int checked = 0;
         for (int i = entries.size() - 1; i >= 0 && checked < config.getChatLimit(); i--) {
             AIChatService.ChatEntry entry = entries.get(i);
-            if (manager.getProfile(entry.getSender()) != null) {
+            if (entry.getSenderType() == AIChatService.ChatSenderType.BOT) {
                 continue;
             }
             String message = entry.getMessage();
@@ -310,6 +323,38 @@ public class RemotePlannerAIController implements AIController {
         return text.contains("hello") || text.contains("hi ") || text.contains("thanks")
                 || text.contains("what ") || text.contains("how are") || text.contains("you ")
                 || text.contains("newbie") || text.contains("learning");
+    }
+
+    private void updateResponders(long sequence) {
+        if (sequence <= 0 || sequence == responderSequence) {
+            return;
+        }
+        synchronized (responderLock) {
+            if (sequence == responderSequence) {
+                return;
+            }
+            List<AIPlayerSession> sessions = manager.getAllSessions().stream()
+                    .filter(session -> session.getNpcHandle().getLocation() != null)
+                    .sorted(Comparator.comparing(session -> session.getProfile().getName()))
+                    .toList();
+            if (sessions.isEmpty()) {
+                responders = Collections.emptySet();
+                responderSequence = sequence;
+                return;
+            }
+            List<AIPlayerSession> shuffled = new ArrayList<>(sessions);
+            Collections.shuffle(shuffled, ThreadLocalRandom.current());
+            int max = Math.max(1, config.getMaxBotsPerPlayerMessage());
+            Set<UUID> selected = new HashSet<>();
+            for (AIPlayerSession session : shuffled) {
+                selected.add(session.getProfile().getUuid());
+                if (selected.size() >= max) {
+                    break;
+                }
+            }
+            responders = Collections.unmodifiableSet(selected);
+            responderSequence = sequence;
+        }
     }
 
     private void logToFile(String message) {

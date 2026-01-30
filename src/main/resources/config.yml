@@ -16,6 +16,7 @@ ai:
     server-id: "betterbox-1"
     server-mode: "LOBBY"
     chat-limit: 10
+    max-bots-per-player-message: 2
     settings:
       max-actions: 3
       min-delay-ms: 800
