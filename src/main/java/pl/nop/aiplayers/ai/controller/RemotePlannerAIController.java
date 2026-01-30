@@ -127,6 +127,10 @@ public class RemotePlannerAIController implements AIController {
             logToFile("Planner response contained no chat action for bot " + session.getProfile().getName());
             return CompletableFuture.completedFuture(Action.idle());
         }
+        if ("__SILENCE__".equals(planned.message)) {
+            logToFile("Planner response instructed silence for bot " + session.getProfile().getName());
+            return CompletableFuture.completedFuture(Action.idle());
+        }
         long delay = Math.max(0, planned.sendAfterMs);
         String cleanedMessage = stripBotPrefix(planned.message, session.getProfile().getName());
         if (cleanedMessage.isBlank()) {
@@ -384,5 +388,6 @@ public class RemotePlannerAIController implements AIController {
         @SerializedName("send_after_ms")
         private long sendAfterMs;
         private String message;
+        private String visibility;
     }
 }
