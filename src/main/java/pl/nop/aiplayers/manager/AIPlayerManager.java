@@ -62,6 +62,38 @@ public class AIPlayerManager {
         logToFile("Loaded AI player profile for " + profile.getName() + " (uuid=" + profile.getUuid() + ")");
     }
 
+    public synchronized int spawnStoredProfiles() {
+        int spawned = 0;
+        for (AIPlayerProfile profile : profiles.values()) {
+            if (sessions.containsKey(profile.getName())) {
+                continue;
+            }
+            Location spawnLocation = profile.getLastKnownLocation();
+            if (spawnLocation == null) {
+                spawnLocation = profile.getSpawnLocation();
+            }
+            if (spawnLocation == null || spawnLocation.getWorld() == null) {
+                plugin.getLogger().warning("Skipping AI player " + profile.getName()
+                        + " because no valid saved location was found.");
+                continue;
+            }
+            if (profile.getSpawnLocation() == null) {
+                profile.setSpawnLocation(spawnLocation.clone());
+            }
+            profile.setLastKnownLocation(spawnLocation.clone());
+            NPCHandle npcHandle = new ProtocolLibNPCHandle(plugin, profile.getUuid(), profile.getName());
+            npcHandle.spawn(spawnLocation);
+            Inventory inventory = Bukkit.createInventory(null, 27, "AI " + profile.getName() + " Inventory");
+            Inventory enderChest = Bukkit.createInventory(null, 27, "AI " + profile.getName() + " EnderChest");
+            AIPlayerSession session = new AIPlayerSession(profile, npcHandle, inventory, enderChest);
+            sessions.put(profile.getName(), session);
+            spawned++;
+            plugin.getLogger().info("Restored AI player " + profile.getName() + " at " + locationToString(spawnLocation));
+            logToFile("Restored AI player " + profile.getName() + " at " + locationToString(spawnLocation));
+        }
+        return spawned;
+    }
+
     public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation, double roamRadius, String chatInstruction) {
         AIPlayerProfile profile = profiles.get(name);
         if (profile == null) {
