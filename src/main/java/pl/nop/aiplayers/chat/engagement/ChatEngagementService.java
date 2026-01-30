@@ -153,7 +153,17 @@ public class ChatEngagementService {
     }
 
     private List<String> buildChatHistory() {
-        List<String> history = chatService.getChatHistorySnapshot();
+        List<AIChatService.ChatEntry> entries = chatService.getChatEntriesSnapshot();
+        if (entries.isEmpty()) {
+            return List.of();
+        }
+        List<String> history = new ArrayList<>();
+        for (AIChatService.ChatEntry entry : entries) {
+            if (entry.getSenderType() != AIChatService.ChatSenderType.PLAYER) {
+                continue;
+            }
+            history.add(entry.getRawLine());
+        }
         if (history.isEmpty()) {
             return history;
         }
@@ -212,13 +222,16 @@ public class ChatEngagementService {
             return "";
         }
         String trimmed = message.trim();
+        if (trimmed.toLowerCase().startsWith("[bot]")) {
+            trimmed = trimmed.substring(5).trim();
+        }
         if (botName != null && !botName.isBlank()) {
             String prefix = botName + ":";
             if (trimmed.startsWith(prefix)) {
                 trimmed = trimmed.substring(prefix.length()).trim();
             }
         }
-        return trimmed;
+        return pl.nop.aiplayers.chat.ChatMessageSanitizer.sanitizeOutgoing(trimmed);
     }
 
     private void logToFile(String message) {

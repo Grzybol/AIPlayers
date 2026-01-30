@@ -19,6 +19,8 @@ public class AIChatListener implements Listener {
     @EventHandler
     public void onChat(AsyncPlayerChatEvent event) {
         BukkitScheduler scheduler = plugin.getServer().getScheduler();
-        scheduler.runTask(plugin, () -> chatService.recordMessage(event.getPlayer().getName() + ": " + event.getMessage()));
+        String sender = event.getPlayer().getName();
+        String message = event.getMessage();
+        scheduler.runTask(plugin, () -> chatService.recordMessage(sender, message, AIChatService.ChatSenderType.PLAYER));
     }
 }
