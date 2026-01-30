@@ -72,6 +72,7 @@ public class AIPlayersPlugin extends JavaPlugin {
 
         loadProfiles();
         promoteRemoteControllerProfiles(remoteConfig, defaultController);
+        restoreSessions();
         registerCommands();
         registerListeners();
         startTickTask();
@@ -163,6 +164,15 @@ public class AIPlayersPlugin extends JavaPlugin {
         }
         if (updated > 0) {
             String message = "Updated " + updated + " AI player profile(s) to use REMOTE controller.";
+            getLogger().info(message);
+            fileLogger.info(message);
+        }
+    }
+
+    private void restoreSessions() {
+        int spawned = aiPlayerManager.spawnStoredProfiles();
+        if (spawned > 0) {
+            String message = "Restored " + spawned + " AI player session(s) from storage.";
             getLogger().info(message);
             fileLogger.info(message);
         }
