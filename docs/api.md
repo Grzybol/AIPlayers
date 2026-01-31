@@ -132,7 +132,7 @@ curl -X POST "http://localhost:8080/v1/plan" \
 
 ### Gdzie jest wywoływane
 - Konfiguracja: `chat.engagement.*` w `config.yml`.
-- Endpoint: `base-url + engage-path` (domyślnie `/v1/engage`).
+- Endpoint: `base-url + plan-path` (domyślnie `/v1/plan`).
 - Wywołanie tylko wtedy, gdy `chat.engagement.engage-players-on-chat` jest włączone i minął czas „ciszy” na czacie.
 
 ### Ile wiadomości z czatu jest wysyłanych
@@ -145,39 +145,107 @@ Do requestu trafia **ostatnie N wiadomości czatu**, gdzie `N` = `chat.engagemen
 {
   "request_id": "uuid",
   "time_ms": 1730000000000,
-  "bot_id": "uuid",
-  "bot_name": "string",
-  "target_player": "string",
-  "chat_history": [
-    "Player1: Siema!",
-    "Player2: Co tam?"
+  "server": {
+    "server_id": "betterbox-1",
+    "mode": "LOBBY",
+    "online_players": 12
+  },
+  "bots": [
+    {
+      "bot_id": "uuid",
+      "name": "BotA",
+      "online": true,
+      "cooldown_ms": 0,
+      "persona": {
+        "language": "pl",
+        "tone": "casual",
+        "style_tags": ["short", "memes_light"],
+        "avoid_topics": ["payments", "admin_powers", "cheating"],
+        "knowledge_level": "average_player"
+      }
+    }
   ],
-  "example_prompt": "Siema PlayerX, robisz coś ciekawego? Nudzi mi się i chcę pogadać!"
+  "chat": [
+    {
+      "ts_ms": 1730000000100,
+      "sender": "Player1",
+      "sender_type": "PLAYER",
+      "message": "Siema!"
+    }
+  ],
+  "settings": {
+    "max_actions": 3,
+    "min_delay_ms": 800,
+    "max_delay_ms": 4500,
+    "global_silence_chance": 0.25,
+    "reply_chance": 0.65
+  },
+  "target_player": "string",
+  "example_prompt": "Napisz krótką wiadomość angażującą gracza/bota o nicku PlayerX."
 }
 ```
 
 ### Opis pól
 - `request_id`: losowy identyfikator requestu (UUID).
 - `time_ms`: timestamp w milisekundach.
-- `bot_id`, `bot_name`: identyfikator i nazwa AIPlayera.
+- `server`: informacje o serwerze (`ai.remote.server-id`, `ai.remote.server-mode`, liczba online).
+- `bots`: lista botów (dla engage gracz-bot zawiera jednego bota).
+- `chat`: ostatnie linie czatu od graczy (limit = `chat.engagement.chat-history-limit`).
+- `settings`: ustawienia planera (kopiowane z `ai.remote.settings.*`).
 - `target_player`: wybrany losowo gracz (nie-bot), do którego bot spróbuje się odezwać.
-- `chat_history`: lista ostatnich wiadomości czatu (limit = `chat.engagement.chat-history-limit`).
-- `example_prompt`: przykładowy prompt generowany przez plugin (pomocniczy, do inspiracji serwisu zewnętrznego).
+- `example_prompt`: krótkie pole z promptem pomocniczym do rozpoczęcia rozmowy.
 
 ### Przykładowe wywołanie (cURL)
 ```bash
-curl -X POST "http://localhost:8080/v1/engage" \
+curl -X POST "http://localhost:8080/v1/plan" \
   -H "Content-Type: application/json" \
   -d '{
     "request_id": "c2a0c349-1f34-4b71-8248-5b8a2f8bbf2c",
     "time_ms": 1730000000000,
-    "bot_id": "6cdb6376-3ba2-421a-8a42-98fc6f8a70f3",
-    "bot_name": "BotA",
-    "target_player": "PlayerX",
-    "chat_history": [
-      "Player1: Siema!",
-      "Player2: Co tam?"
+    "server": {
+      "server_id": "betterbox-1",
+      "mode": "LOBBY",
+      "online_players": 12
+    },
+    "bots": [
+      {
+        "bot_id": "6cdb6376-3ba2-421a-8a42-98fc6f8a70f3",
+        "name": "BotA",
+        "online": true,
+        "cooldown_ms": 0,
+        "persona": {
+          "language": "pl",
+          "tone": "casual",
+          "style_tags": ["short", "memes_light"],
+          "avoid_topics": ["payments", "admin_powers", "cheating"],
+          "knowledge_level": "average_player"
+        }
+      }
     ],
-    "example_prompt": "Siema PlayerX, robisz coś ciekawego? Nudzi mi się i chcę pogadać!"
+    "chat": [
+      {
+        "ts_ms": 1730000000100,
+        "sender": "Player1",
+        "sender_type": "PLAYER",
+        "message": "Siema!"
+      }
+    ],
+    "settings": {
+      "max_actions": 3,
+      "min_delay_ms": 800,
+      "max_delay_ms": 4500,
+      "global_silence_chance": 0.25,
+      "reply_chance": 0.65
+    },
+    "target_player": "PlayerX",
+    "example_prompt": "Napisz krótką wiadomość angażującą gracza/bota o nicku PlayerX."
   }'
 ```
+
+### Bot2bot engagement
+- Konfiguracja: `chat.engagement.bot2bot.*` w `config.yml`.
+- Endpoint: `base-url + plan-path` (domyślnie `/v1/plan`).
+- Wywołanie tylko wtedy, gdy `chat.engagement.bot2bot.enabled` jest włączone, minął czas ciszy
+  w zakresie `min/max-empty-chat-time-to-engage-in-seconds` i jest dostępnych przynajmniej 2 boty online.
+- `settings.global_silence_chance` jest zwiększane o `bot2bot.silence-multiplier` przy każdej kolejnej próbie,
+  aby rozmowa botów nie trwała w nieskończoność.

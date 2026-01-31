@@ -42,8 +42,14 @@ chat:
     engage-players-on-chat: false
     min-empty-chat-time-to-engage-in-seconds: 120
     max-empty-chat-time-to-engage-in-seconds: 300
+    bot2bot:
+      enabled: false
+      min-empty-chat-time-to-engage-in-seconds: 180
+      max-empty-chat-time-to-engage-in-seconds: 360
+      base-silence-chance: 0.3
+      silence-multiplier: 0.5
     base-url: "http://localhost:8080"
-    engage-path: "/v1/engage"
+    plan-path: "/v1/plan"
     connect-timeout-millis: 2000
     request-timeout-millis: 5000
     chat-history-limit: 10
