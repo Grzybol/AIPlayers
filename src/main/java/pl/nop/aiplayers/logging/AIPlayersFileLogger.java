@@ -17,10 +17,12 @@ public class AIPlayersFileLogger {
     private final AIPlayersPlugin plugin;
     private final Path logsDirectory;
     private Path currentLogFile;
+    private final ElasticBufferBridge elasticBufferBridge;
 
     public AIPlayersFileLogger(AIPlayersPlugin plugin) {
         this.plugin = plugin;
         this.logsDirectory = plugin.getDataFolder().toPath().resolve("logs");
+        this.elasticBufferBridge = ElasticBufferBridge.create(plugin);
         refreshLogFile();
     }
 
@@ -46,6 +48,7 @@ public class AIPlayersFileLogger {
         } catch (IOException e) {
             plugin.getLogger().warning("Failed to write to AIPlayers log file: " + e.getMessage());
         }
+        elasticBufferBridge.log(level, message);
     }
 
     private void refreshLogFile() {
