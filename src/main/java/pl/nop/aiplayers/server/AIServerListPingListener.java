@@ -1,0 +1,27 @@
+package pl.nop.aiplayers.server;
+
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.server.ServerListPingEvent;
+import pl.nop.aiplayers.manager.AIPlayerManager;
+
+public class AIServerListPingListener implements Listener {
+
+    private final AIPlayerManager aiPlayerManager;
+
+    public AIServerListPingListener(AIPlayerManager aiPlayerManager) {
+        this.aiPlayerManager = aiPlayerManager;
+    }
+
+    @EventHandler
+    public void onServerListPing(ServerListPingEvent event) {
+        if (aiPlayerManager == null) {
+            return;
+        }
+        int aiCount = aiPlayerManager.getAllSessions().size();
+        if (aiCount <= 0) {
+            return;
+        }
+        event.setNumPlayers(event.getNumPlayers() + aiCount);
+    }
+}

@@ -22,6 +22,7 @@ import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIBehaviorMode;
 import pl.nop.aiplayers.model.AIControllerType;
 import pl.nop.aiplayers.npc.NPCJoinListener;
+import pl.nop.aiplayers.server.AIServerListPingListener;
 import pl.nop.aiplayers.storage.AIPlayerStorage;
 import pl.nop.aiplayers.task.AITickTask;
 
@@ -94,6 +95,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         PluginManager pluginManager = Bukkit.getPluginManager();
         pluginManager.registerEvents(new AIChatListener(this, chatService), this);
         pluginManager.registerEvents(new NPCJoinListener(this, aiPlayerManager), this);
+        pluginManager.registerEvents(new AIServerListPingListener(aiPlayerManager), this);
     }
 
     private void startTickTask() {
