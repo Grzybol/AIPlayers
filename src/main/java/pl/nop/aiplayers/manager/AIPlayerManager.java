@@ -27,8 +27,8 @@ public class AIPlayerManager {
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
     private final AIEconomyService economyService;
-    private final AIControllerType defaultControllerType;
-    private final AIBehaviorMode defaultBehaviorMode;
+    private AIControllerType defaultControllerType;
+    private AIBehaviorMode defaultBehaviorMode;
 
     public AIPlayerManager(Plugin plugin, AIEconomyService economyService, AIControllerType defaultControllerType,
                            AIBehaviorMode defaultBehaviorMode) {
@@ -36,6 +36,15 @@ public class AIPlayerManager {
         this.economyService = economyService;
         this.defaultControllerType = defaultControllerType;
         this.defaultBehaviorMode = defaultBehaviorMode;
+    }
+
+    public synchronized void updateDefaults(AIControllerType controllerType, AIBehaviorMode behaviorMode) {
+        if (controllerType != null) {
+            this.defaultControllerType = controllerType;
+        }
+        if (behaviorMode != null) {
+            this.defaultBehaviorMode = behaviorMode;
+        }
     }
 
     public synchronized AIPlayerProfile createProfile(String name, Location location, double roamRadius, String chatInstruction) {

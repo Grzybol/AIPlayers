@@ -30,9 +30,9 @@ public class ChatEngagementService {
     private final Plugin plugin;
     private final AIChatService chatService;
     private final AIPlayerManager aiPlayerManager;
-    private final ChatEngagementConfig config;
+    private ChatEngagementConfig config;
     private final Gson gson;
-    private final HttpClient httpClient;
+    private HttpClient httpClient;
     private final AtomicReference<Long> nextEngageAtMillis;
     private final AtomicLong lastAttemptMillis;
 
@@ -43,9 +43,7 @@ public class ChatEngagementService {
         this.aiPlayerManager = aiPlayerManager;
         this.config = config;
         this.gson = new Gson();
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(config.getConnectTimeout())
-                .build();
+        this.httpClient = buildHttpClient(config);
         this.nextEngageAtMillis = new AtomicReference<>();
         this.lastAttemptMillis = new AtomicLong(0L);
     }
@@ -78,6 +76,22 @@ public class ChatEngagementService {
             return;
         }
         sendRequest(bot.get(), request, nowMillis);
+    }
+
+    public void updateConfig(ChatEngagementConfig newConfig) {
+        if (newConfig == null) {
+            return;
+        }
+        this.config = newConfig;
+        this.httpClient = buildHttpClient(newConfig);
+        this.nextEngageAtMillis.set(0L);
+        this.lastAttemptMillis.set(0L);
+    }
+
+    private HttpClient buildHttpClient(ChatEngagementConfig currentConfig) {
+        return HttpClient.newBuilder()
+                .connectTimeout(currentConfig.getConnectTimeout())
+                .build();
     }
 
     private boolean shouldSchedule(long nowMillis, long lastChatUpdate) {

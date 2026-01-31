@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
 import pl.nop.aiplayers.ai.controller.DummyAIController;
 import pl.nop.aiplayers.ai.controller.RemotePlannerAIController;
@@ -34,6 +35,7 @@ public class AIPlayersPlugin extends JavaPlugin {
     private ActionExecutor actionExecutor;
     private AIPlayersFileLogger fileLogger;
     private ChatEngagementService engagementService;
+    private BukkitTask tickTask;
 
     @Override
     public void onEnable() {
@@ -83,7 +85,7 @@ public class AIPlayersPlugin extends JavaPlugin {
     }
 
     private void registerCommands() {
-        AIPlayersCommand commandExecutor = new AIPlayersCommand(aiPlayerManager);
+        AIPlayersCommand commandExecutor = new AIPlayersCommand(this, aiPlayerManager);
         getCommand("aiplayers").setExecutor(commandExecutor);
         getCommand("aiplayers").setTabCompleter(new AIPlayersTabCompleter(aiPlayerManager));
     }
@@ -96,7 +98,7 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     private void startTickTask() {
         int interval = getConfig().getInt("ai.tick-interval-ticks", 10);
-        new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor, engagementService)
+        tickTask = new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor, engagementService)
                 .runTaskTimer(this, interval, interval);
     }
 
@@ -136,13 +138,37 @@ public class AIPlayersPlugin extends JavaPlugin {
         return storage;
     }
 
-    private void registerRemoteController(RemotePlannerConfig remoteConfig) {
-        if (!remoteConfig.isEnabled()) {
-            return;
+    public void reloadPluginConfig() {
+        reloadConfig();
+        FileConfiguration config = getConfig();
+        chatService.updateSettings(
+                config.getInt("chat.history-size", 20),
+                config.getLong("chat.rate-limit-millis", 3000L));
+        actionExecutor.updateSettings(
+                config.getInt("ai.action-queue-size", 5),
+                config.getLong("ai.action-timeout-millis", 4000L),
+                config.getLong("ai.action-cooldown-millis", 500L));
+        if (engagementService != null) {
+            engagementService.updateConfig(new ChatEngagementConfig(config));
         }
-        if (remoteConfig.getBaseUrl() == null || remoteConfig.getBaseUrl().isBlank()) {
-            getLogger().warning("Remote planner enabled but base-url is empty. Skipping REMOTE controller registration.");
-            return;
+        RemotePlannerConfig remoteConfig = new RemotePlannerConfig(config);
+        registerRemoteController(remoteConfig);
+        AIControllerType defaultController = parseControllerType(config.getString("ai.default.controller-type", "DUMMY"));
+        AIBehaviorMode defaultBehavior = parseBehaviorMode(config.getString("ai.default.behavior-mode", "WANDER"));
+        if (remoteConfig.isEnabled() && defaultController == AIControllerType.DUMMY
+                && remoteConfig.getBaseUrl() != null && !remoteConfig.getBaseUrl().isBlank()) {
+            defaultController = AIControllerType.REMOTE;
+        }
+        aiPlayerManager.updateDefaults(defaultController, defaultBehavior);
+        if (tickTask != null) {
+            tickTask.cancel();
+        }
+        startTickTask();
+    }
+
+    private void registerRemoteController(RemotePlannerConfig remoteConfig) {
+        if (remoteConfig.isEnabled() && (remoteConfig.getBaseUrl() == null || remoteConfig.getBaseUrl().isBlank())) {
+            getLogger().warning("Remote planner enabled but base-url is empty. Planner requests will be skipped.");
         }
         RemotePlannerAIController remoteController = new RemotePlannerAIController(this, chatService, aiPlayerManager, remoteConfig);
         controllerRegistry.register(AIControllerType.REMOTE, remoteController);
