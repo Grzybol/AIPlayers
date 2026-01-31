@@ -2,7 +2,7 @@ package pl.nop.aiplayers.server;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.server.ServerListPingEvent;
+import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 
 public class AIServerListPingListener implements Listener {
@@ -14,7 +14,7 @@ public class AIServerListPingListener implements Listener {
     }
 
     @EventHandler
-    public void onServerListPing(ServerListPingEvent event) {
+    public void onServerListPing(PaperServerListPingEvent event) {
         if (aiPlayerManager == null) {
             return;
         }
