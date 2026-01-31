@@ -20,8 +20,8 @@ public class AIChatService {
 
     private final Plugin plugin;
     private final Deque<ChatEntry> chatHistory;
-    private final int maxSize;
-    private final long rateLimitMillis;
+    private int maxSize;
+    private long rateLimitMillis;
     private final Map<UUID, Long> lastMessageMillis = new ConcurrentHashMap<>();
     private final AtomicLong sequenceCounter = new AtomicLong(0L);
     private volatile long lastChatUpdateMillis;
@@ -31,8 +31,8 @@ public class AIChatService {
     public AIChatService(Plugin plugin, int maxSize, long rateLimitMillis) {
         this.plugin = plugin;
         this.chatHistory = new ArrayDeque<>();
-        this.maxSize = maxSize;
-        this.rateLimitMillis = rateLimitMillis;
+        this.maxSize = Math.max(1, maxSize);
+        this.rateLimitMillis = Math.max(0, rateLimitMillis);
     }
 
     public synchronized void recordMessage(String sender, String message, ChatSenderType senderType) {
@@ -68,6 +68,14 @@ public class AIChatService {
 
     public synchronized List<ChatEntry> getChatEntriesSnapshot() {
         return new ArrayList<>(chatHistory);
+    }
+
+    public synchronized void updateSettings(int newMaxSize, long newRateLimitMillis) {
+        this.maxSize = Math.max(1, newMaxSize);
+        this.rateLimitMillis = Math.max(0, newRateLimitMillis);
+        while (chatHistory.size() > maxSize) {
+            chatHistory.removeFirst();
+        }
     }
 
     public void sendChatMessage(AIPlayerSession session, String message) {

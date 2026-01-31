@@ -22,7 +22,7 @@ public class AIPlayersTabCompleter implements TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("add", "remove", "list", "inspect");
+            return Arrays.asList("add", "remove", "list", "inspect", "reload");
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("inspect"))) {
             return manager.getAllSessions().stream()

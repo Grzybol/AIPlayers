@@ -16,17 +16,17 @@ import java.util.UUID;
 public class ActionExecutor {
 
     private final AIChatService chatService;
-    private final int maxQueueSize;
-    private final long actionTimeoutMillis;
-    private final long actionCooldownMillis;
+    private int maxQueueSize;
+    private long actionTimeoutMillis;
+    private long actionCooldownMillis;
     private final Map<UUID, Deque<QueuedAction>> queues = new HashMap<>();
     private final Map<UUID, Long> lastActionMillis = new HashMap<>();
 
     public ActionExecutor(AIChatService chatService, int maxQueueSize, long actionTimeoutMillis, long actionCooldownMillis) {
         this.chatService = chatService;
-        this.maxQueueSize = maxQueueSize;
-        this.actionTimeoutMillis = actionTimeoutMillis;
-        this.actionCooldownMillis = actionCooldownMillis;
+        this.maxQueueSize = Math.max(1, maxQueueSize);
+        this.actionTimeoutMillis = Math.max(0, actionTimeoutMillis);
+        this.actionCooldownMillis = Math.max(0, actionCooldownMillis);
     }
 
     public void submit(AIPlayerSession session, Action action) {
@@ -64,6 +64,17 @@ public class ActionExecutor {
         queue.removeFirst();
         executeAction(session, queued.getAction());
         lastActionMillis.put(uuid, now);
+    }
+
+    public void updateSettings(int newMaxQueueSize, long newActionTimeoutMillis, long newActionCooldownMillis) {
+        this.maxQueueSize = Math.max(1, newMaxQueueSize);
+        this.actionTimeoutMillis = Math.max(0, newActionTimeoutMillis);
+        this.actionCooldownMillis = Math.max(0, newActionCooldownMillis);
+        for (Deque<QueuedAction> queue : queues.values()) {
+            while (queue.size() > maxQueueSize) {
+                queue.removeFirst();
+            }
+        }
     }
 
     private void executeAction(AIPlayerSession session, Action action) {

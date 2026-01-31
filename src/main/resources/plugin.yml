@@ -11,7 +11,7 @@ softdepend:
 commands:
   aiplayers:
     description: "Manage AI players."
-    usage: "/aiplayers <add|remove|list|inspect>"
+    usage: "/aiplayers <add|remove|list|inspect|reload>"
     permission: "aiplayers.admin"
 permissions:
   aiplayers.admin:
