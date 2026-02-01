@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -232,6 +233,7 @@ public class ChatEngagementService {
     private void sendRequest(AIPlayerSession botSession, EngagementRequest request, long nowMillis) {
         String payload = gson.toJson(request);
         String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
@@ -241,22 +243,31 @@ public class ChatEngagementService {
         logToFile("Sending engagement request " + request.requestId + " to " + targetUrl
                 + " for bot=" + botSession.getProfile().getName() + ", target=" + request.targetPlayer);
         logToFile("Engagement request " + request.requestId + " payload: " + payload);
+        logToFile("Engagement request " + request.requestId + " timeouts: connect="
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
 
         httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
+                    long durationMillis = System.currentTimeMillis() - startMillis;
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Engagement API responded with status " + response.statusCode());
                         logToFile("Engagement response " + request.requestId + " status " + response.statusCode()
+                                + ", durationMs=" + durationMillis
                                 + ", payload=" + response.body());
                         return null;
                     }
-                    logToFile("Engagement response " + request.requestId + " payload=" + response.body());
+                    logToFile("Engagement response " + request.requestId + " durationMs=" + durationMillis
+                            + ", payload=" + response.body());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenAccept(response -> handlePlannerResponse(botSession, response))
                 .exceptionally(ex -> {
-                    plugin.getLogger().warning("Engagement API request failed: " + ex.getMessage());
-                    logToFile("Engagement API request failed for " + request.requestId + ": " + ex.getMessage());
+                    String details = describeException(ex);
+                    long durationMillis = System.currentTimeMillis() - startMillis;
+                    String message = "Engagement API request failed after " + durationMillis + "ms to " + targetUrl
+                            + " for request " + request.requestId + ": " + details;
+                    plugin.getLogger().warning(message);
+                    logToFile(message);
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNext(nowMillis));
@@ -495,6 +506,7 @@ public class ChatEngagementService {
     private void sendBot2BotRequest(AIPlayerSession botSession, Bot2BotRequest request, long nowMillis) {
         String payload = gson.toJson(request);
         String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
@@ -505,22 +517,31 @@ public class ChatEngagementService {
                 + " for bot=" + botSession.getProfile().getName()
                 + ", target=" + request.targetPlayer);
         logToFile("Bot2bot engagement request " + request.requestId + " payload: " + payload);
+        logToFile("Bot2bot engagement request " + request.requestId + " timeouts: connect="
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
 
         httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
+                    long durationMillis = System.currentTimeMillis() - startMillis;
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Bot2bot engagement API responded with status " + response.statusCode());
                         logToFile("Bot2bot engagement response " + request.requestId + " status " + response.statusCode()
+                                + ", durationMs=" + durationMillis
                                 + ", payload=" + response.body());
                         return null;
                     }
-                    logToFile("Bot2bot engagement response " + request.requestId + " payload=" + response.body());
+                    logToFile("Bot2bot engagement response " + request.requestId + " durationMs=" + durationMillis
+                            + ", payload=" + response.body());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenAccept(response -> handlePlannerResponse(botSession, response))
                 .exceptionally(ex -> {
-                    plugin.getLogger().warning("Bot2bot engagement API request failed: " + ex.getMessage());
-                    logToFile("Bot2bot engagement API request failed for " + request.requestId + ": " + ex.getMessage());
+                    String details = describeException(ex);
+                    long durationMillis = System.currentTimeMillis() - startMillis;
+                    String message = "Bot2bot engagement API request failed after " + durationMillis + "ms to " + targetUrl
+                            + " for request " + request.requestId + ": " + details;
+                    plugin.getLogger().warning(message);
+                    logToFile(message);
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNextBot2Bot(nowMillis));
@@ -538,6 +559,28 @@ public class ChatEngagementService {
             return ((AIPlayersPlugin) plugin).getFileLogger();
         }
         return null;
+    }
+
+    private String describeException(Throwable ex) {
+        Throwable root = ex;
+        if (ex instanceof CompletionException && ex.getCause() != null) {
+            root = ex.getCause();
+        }
+        StringBuilder details = new StringBuilder(root.getClass().getSimpleName());
+        String message = root.getMessage();
+        if (message != null && !message.isBlank()) {
+            details.append(": ").append(message);
+        }
+        Throwable cause = root.getCause();
+        if (cause != null && cause != root) {
+            details.append(" (cause: ").append(cause.getClass().getSimpleName());
+            String causeMessage = cause.getMessage();
+            if (causeMessage != null && !causeMessage.isBlank()) {
+                details.append(": ").append(causeMessage);
+            }
+            details.append(")");
+        }
+        return details.toString();
     }
 
     private static class EngagementRequest {
