@@ -249,3 +249,100 @@ curl -X POST "http://localhost:8080/v1/plan" \
   w zakresie `min/max-empty-chat-time-to-engage-in-seconds` i jest dostępnych przynajmniej 2 boty online.
 - `settings.global_silence_chance` jest zwiększane o `bot2bot.silence-multiplier` przy każdej kolejnej próbie,
   aby rozmowa botów nie trwała w nieskończoność.
+
+---
+
+## 3. Velocity Player Count Bridge API (proxy ↔ backend)
+
+Ten rozdział opisuje **prosty protokół komunikacji** pomiędzy pluginem Bukkit/Paper (AIPlayers)
+a osobnym pluginem na Velocity. Celem jest raportowanie do proxy **sumarycznej liczby graczy**
+(humans + AI) ze wszystkich serwerów w sieci i podmiana wartości w odpowiedzi ping listy serwerów.
+
+### Założenia
+- **Każdy backend** (Paper/Spigot) z AIPlayers wysyła okresowo (lub przy zmianach) liczbę graczy.
+- **Plugin Velocity** zbiera raporty ze wszystkich serwerów i **nadpisuje licznik online** w pingach.
+- Komunikacja oparta o **Plugin Messaging Channel** (Velocity <-> Bukkit), ponieważ jest szybka
+  i nie wymaga zewnętrznych zależności. Alternatywnie można to przenieść na Redis/HTTP, ale
+  poniżej opisano wariant oparty o messaging.
+
+### Kanały i format
+Kanał główny: `aiplayers:count`
+
+Wiadomości są kodowane jako JSON (UTF-8). Zalecany format:
+
+```json
+{
+  "protocol": "aiplayers-count-v1",
+  "server_id": "survival-1",
+  "timestamp_ms": 1730000000000,
+  "online_humans": 12,
+  "online_ai": 5,
+  "online_total": 17,
+  "max_players_override": 0
+}
+```
+
+#### Opis pól
+- `protocol`: wersja protokołu, stała wartość `aiplayers-count-v1`.
+- `server_id`: identyfikator backendu; powinien odpowiadać `ai.remote.server-id` albo nazwie z konfiguracji Velocity.
+- `timestamp_ms`: czas wysłania (system time w ms).
+- `online_humans`: liczba realnych graczy (Bukkit `getOnlinePlayers().size()`).
+- `online_ai`: liczba aktywnych AI (sesje AI).
+- `online_total`: suma humans + AI (wartość docelowa do agregacji na proxy).
+- `max_players_override`: opcjonalnie, jeśli > 0, Velocity może ustawić max players na tę wartość lub
+  przynajmniej `max(current, override)`.
+
+### Cykl wysyłki (backend → Velocity)
+- **Heartbeat co 5–10 sekund** (konfigurowalne).
+- **Dodatkowo** wysyłka przy zdarzeniach:
+  - join/quit gracza,
+  - spawn/despawn AI,
+  - restart/reload pluginu.
+
+### Agregacja i logika po stronie Velocity
+1. Velocity przechowuje `last_seen` + `online_total` dla każdego backendu.
+2. Jeżeli `last_seen` jest starsze niż np. 30s, backend uznawany jest za offline i **nie jest sumowany**.
+3. Na `ProxyPingEvent` proxy:
+   - sumuje wszystkie aktywne `online_total`,
+   - opcjonalnie sumuje `online_humans` i `online_ai` (na potrzeby debugowania),
+   - ustawia `ping.setOnlinePlayers(sum)`.
+4. Wartość `max_players`:
+   - jeśli `max_players_override > 0` z któregokolwiek backendu, można przyjąć `max` z tych wartości,
+   - w przeciwnym razie zachować konfigurację proxy.
+
+### Obsługa błędów / bezpieczeństwo
+- Jeśli `protocol` się nie zgadza → zignorować wiadomość.
+- Jeśli `online_total` < `online_humans + online_ai` → poprawić na sumę.
+- Jeśli `server_id` jest nieznany dla Velocity → przyjąć, ale oznaczyć jako `unverified` w logach (opcjonalnie).
+
+### Przykładowy payload (backend → Velocity)
+```json
+{
+  "protocol": "aiplayers-count-v1",
+  "server_id": "lobby-1",
+  "timestamp_ms": 1730000012345,
+  "online_humans": 32,
+  "online_ai": 8,
+  "online_total": 40,
+  "max_players_override": 0
+}
+```
+
+### Wymagane API po stronie AIPlayers (Bukkit/Paper)
+1. **Publiczna metoda** do pobierania liczb:
+   - `getOnlineHumansCount()` (lub użycie `Bukkit.getOnlinePlayers().size()`),
+   - `getOnlineAICount()` (sesje AI),
+   - `getOnlineTotalCount()` (suma).
+2. **Scheduler / task** wysyłający heartbeat na kanał `aiplayers:count`.
+3. **Listener** na zdarzenia join/quit i spawn/despawn AI, aby triggerować szybką aktualizację.
+
+### Wymagane API po stronie Velocity
+1. **Rejestracja kanału** `aiplayers:count`.
+2. **Listener** na `PluginMessageEvent` do parsowania JSON.
+3. **Cache** z `server_id → {online_total, last_seen, max_players_override}`.
+4. **Listener** na `ProxyPingEvent` do nadpisania liczby online.
+
+### Notatki dla Codexa
+- Zakładamy Velocity 3.4.0.
+- Protokół jest **jednokierunkowy** (backend → proxy), brak potrzeby ACK.
+- JSON można parsować przez Gson (Velocity i Bukkit).
