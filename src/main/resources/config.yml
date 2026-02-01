@@ -10,11 +10,13 @@ ai:
     enabled: false
     base-url: "http://localhost:8080"
     plan-path: "/v1/plan"
-    request-timeout-millis: 1500
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
     request-interval-millis: 30000
     server-id: "betterbox-1"
     server-mode: "LOBBY"
     chat-limit: 10
+    max-bots-per-player-message: 2
     settings:
       max-actions: 3
       min-delay-ms: 800
@@ -36,5 +38,20 @@ chat:
   history-size: 20
   memory-size: 20
   rate-limit-millis: 3000
+  engagement:
+    engage-players-on-chat: false
+    min-empty-chat-time-to-engage-in-seconds: 120
+    max-empty-chat-time-to-engage-in-seconds: 300
+    bot2bot:
+      enabled: false
+      min-empty-chat-time-to-engage-in-seconds: 180
+      max-empty-chat-time-to-engage-in-seconds: 360
+      base-silence-chance: 0.3
+      silence-multiplier: 0.5
+    base-url: "http://localhost:8080"
+    plan-path: "/v1/plan"
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
+    chat-history-limit: 10
 economy:
   enabled: true

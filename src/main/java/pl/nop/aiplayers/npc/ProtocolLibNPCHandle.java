@@ -97,6 +97,16 @@ public class ProtocolLibNPCHandle implements NPCHandle {
         moveTo(location);
     }
 
+    @Override
+    public void showTo(Player player) {
+        if (player == null || manager == null || location == null) {
+            return;
+        }
+        sendPlayerInfo(EnumWrappers.PlayerInfoAction.ADD_PLAYER, player);
+        sendNamedEntitySpawn(player);
+        sendHeadRotation(location, player);
+    }
+
     private void sendPlayerInfo(EnumWrappers.PlayerInfoAction action) {
         PacketContainer packet = manager.createPacket(PacketType.Play.Server.PLAYER_INFO);
         WrappedGameProfile profile = new WrappedGameProfile(uuid, name);
@@ -104,6 +114,15 @@ public class ProtocolLibNPCHandle implements NPCHandle {
         packet.getPlayerInfoAction().write(0, action);
         packet.getPlayerInfoDataLists().write(0, Collections.singletonList(data));
         broadcastPacket(packet);
+    }
+
+    private void sendPlayerInfo(EnumWrappers.PlayerInfoAction action, Player player) {
+        PacketContainer packet = manager.createPacket(PacketType.Play.Server.PLAYER_INFO);
+        WrappedGameProfile profile = new WrappedGameProfile(uuid, name);
+        PlayerInfoData data = new PlayerInfoData(profile, 0, EnumWrappers.NativeGameMode.SURVIVAL, WrappedChatComponent.fromText(name));
+        packet.getPlayerInfoAction().write(0, action);
+        packet.getPlayerInfoDataLists().write(0, Collections.singletonList(data));
+        sendPacket(player, packet);
     }
 
     private void sendNamedEntitySpawn() {
@@ -118,11 +137,30 @@ public class ProtocolLibNPCHandle implements NPCHandle {
         broadcastPacket(packet);
     }
 
+    private void sendNamedEntitySpawn(Player player) {
+        PacketContainer packet = manager.createPacket(PacketType.Play.Server.NAMED_ENTITY_SPAWN);
+        packet.getIntegers().write(0, entityId);
+        packet.getUUIDs().write(0, uuid);
+        packet.getDoubles().write(0, location.getX());
+        packet.getDoubles().write(1, location.getY());
+        packet.getDoubles().write(2, location.getZ());
+        packet.getBytes().write(0, (byte) ((location.getYaw() % 360) * 256 / 360));
+        packet.getBytes().write(1, (byte) ((location.getPitch() % 360) * 256 / 360));
+        sendPacket(player, packet);
+    }
+
     private void sendHeadRotation(Location target) {
         PacketContainer head = manager.createPacket(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
         head.getIntegers().write(0, entityId);
         head.getBytes().write(0, (byte) ((target.getYaw() % 360) * 256 / 360));
         broadcastPacket(head);
+    }
+
+    private void sendHeadRotation(Location target, Player player) {
+        PacketContainer head = manager.createPacket(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
+        head.getIntegers().write(0, entityId);
+        head.getBytes().write(0, (byte) ((target.getYaw() % 360) * 256 / 360));
+        sendPacket(player, head);
     }
 
     private void broadcastPacket(PacketContainer packet) {
@@ -132,6 +170,14 @@ public class ProtocolLibNPCHandle implements NPCHandle {
             } catch (InvocationTargetException e) {
                 plugin.getLogger().warning("Failed to send NPC packet: " + e.getMessage());
             }
+        }
+    }
+
+    private void sendPacket(Player player, PacketContainer packet) {
+        try {
+            manager.sendServerPacket(player, packet);
+        } catch (InvocationTargetException e) {
+            plugin.getLogger().warning("Failed to send NPC packet: " + e.getMessage());
         }
     }
 }

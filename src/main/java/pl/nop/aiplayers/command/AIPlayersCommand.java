@@ -11,8 +11,10 @@ import pl.nop.aiplayers.model.AIPlayerSession;
 
 public class AIPlayersCommand implements CommandExecutor {
 
+    private final pl.nop.aiplayers.AIPlayersPlugin plugin;
     private final AIPlayerManager manager;
-    public AIPlayersCommand(AIPlayerManager manager) {
+    public AIPlayersCommand(pl.nop.aiplayers.AIPlayersPlugin plugin, AIPlayerManager manager) {
+        this.plugin = plugin;
         this.manager = manager;
     }
 
@@ -24,7 +26,7 @@ public class AIPlayersCommand implements CommandExecutor {
         }
 
         if (args.length == 0) {
-            sender.sendMessage(ChatColor.YELLOW + "/aiplayers <add|remove|list|inspect>");
+            sender.sendMessage(ChatColor.YELLOW + "/aiplayers <add|remove|list|inspect|reload>");
             return true;
         }
 
@@ -41,6 +43,9 @@ public class AIPlayersCommand implements CommandExecutor {
                 break;
             case "inspect":
                 handleInspect(sender, args);
+                break;
+            case "reload":
+                handleReload(sender);
                 break;
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown subcommand");
@@ -62,6 +67,11 @@ public class AIPlayersCommand implements CommandExecutor {
             return;
         }
         String name = args[1];
+        if (name.length() > AIPlayerManager.MAX_NAME_LENGTH) {
+            sender.sendMessage(ChatColor.RED + "AI player name cannot be longer than "
+                    + AIPlayerManager.MAX_NAME_LENGTH + " characters.");
+            return;
+        }
         double radius;
         try {
             radius = Double.parseDouble(args[2]);
@@ -123,6 +133,11 @@ public class AIPlayersCommand implements CommandExecutor {
             return;
         }
         ((Player) sender).openInventory(session.getInventory());
+    }
+
+    private void handleReload(CommandSender sender) {
+        plugin.reloadPluginConfig();
+        sender.sendMessage(ChatColor.GREEN + "AIPlayers configuration reloaded.");
     }
 
     private String parseInstruction(String[] args, int startIndex) {

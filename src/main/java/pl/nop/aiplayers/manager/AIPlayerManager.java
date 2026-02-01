@@ -23,12 +23,13 @@ import java.util.UUID;
 
 public class AIPlayerManager {
 
+    public static final int MAX_NAME_LENGTH = 16;
     private final Plugin plugin;
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
     private final AIEconomyService economyService;
-    private final AIControllerType defaultControllerType;
-    private final AIBehaviorMode defaultBehaviorMode;
+    private AIControllerType defaultControllerType;
+    private AIBehaviorMode defaultBehaviorMode;
 
     public AIPlayerManager(Plugin plugin, AIEconomyService economyService, AIControllerType defaultControllerType,
                            AIBehaviorMode defaultBehaviorMode) {
@@ -36,6 +37,15 @@ public class AIPlayerManager {
         this.economyService = economyService;
         this.defaultControllerType = defaultControllerType;
         this.defaultBehaviorMode = defaultBehaviorMode;
+    }
+
+    public synchronized void updateDefaults(AIControllerType controllerType, AIBehaviorMode behaviorMode) {
+        if (controllerType != null) {
+            this.defaultControllerType = controllerType;
+        }
+        if (behaviorMode != null) {
+            this.defaultBehaviorMode = behaviorMode;
+        }
     }
 
     public synchronized AIPlayerProfile createProfile(String name, Location location, double roamRadius, String chatInstruction) {
@@ -62,7 +72,49 @@ public class AIPlayerManager {
         logToFile("Loaded AI player profile for " + profile.getName() + " (uuid=" + profile.getUuid() + ")");
     }
 
+    public synchronized int spawnStoredProfiles() {
+        int spawned = 0;
+        for (AIPlayerProfile profile : profiles.values()) {
+            if (sessions.containsKey(profile.getName())) {
+                continue;
+            }
+            if (profile.getName().length() > MAX_NAME_LENGTH) {
+                plugin.getLogger().warning("Skipping AI player " + profile.getName()
+                        + " because name exceeds " + MAX_NAME_LENGTH + " characters.");
+                continue;
+            }
+            Location spawnLocation = profile.getLastKnownLocation();
+            if (spawnLocation == null) {
+                spawnLocation = profile.getSpawnLocation();
+            }
+            if (spawnLocation == null || spawnLocation.getWorld() == null) {
+                plugin.getLogger().warning("Skipping AI player " + profile.getName()
+                        + " because no valid saved location was found.");
+                continue;
+            }
+            if (profile.getSpawnLocation() == null) {
+                profile.setSpawnLocation(spawnLocation.clone());
+            }
+            profile.setLastKnownLocation(spawnLocation.clone());
+            NPCHandle npcHandle = new ProtocolLibNPCHandle(plugin, profile.getUuid(), profile.getName());
+            npcHandle.spawn(spawnLocation);
+            Inventory inventory = Bukkit.createInventory(null, 27, "AI " + profile.getName() + " Inventory");
+            Inventory enderChest = Bukkit.createInventory(null, 27, "AI " + profile.getName() + " EnderChest");
+            AIPlayerSession session = new AIPlayerSession(profile, npcHandle, inventory, enderChest);
+            sessions.put(profile.getName(), session);
+            spawned++;
+            plugin.getLogger().info("Restored AI player " + profile.getName() + " at " + locationToString(spawnLocation));
+            logToFile("Restored AI player " + profile.getName() + " at " + locationToString(spawnLocation));
+        }
+        return spawned;
+    }
+
     public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation, double roamRadius, String chatInstruction) {
+        if (name.length() > MAX_NAME_LENGTH) {
+            plugin.getLogger().warning("Skipping AI player spawn for " + name
+                    + " because name exceeds " + MAX_NAME_LENGTH + " characters.");
+            return null;
+        }
         AIPlayerProfile profile = profiles.get(name);
         if (profile == null) {
             profile = createProfile(name, spawnLocation, roamRadius, chatInstruction);
@@ -113,6 +165,14 @@ public class AIPlayerManager {
 
     public synchronized Collection<AIPlayerSession> getAllSessions() {
         return Collections.unmodifiableCollection(sessions.values());
+    }
+
+    public synchronized int getOnlineSessionCount() {
+        return sessions.size();
+    }
+
+    public synchronized int getTotalOnlineCount() {
+        return Bukkit.getOnlinePlayers().size() + sessions.size();
     }
 
     public synchronized Collection<AIPlayerProfile> getAllProfiles() {

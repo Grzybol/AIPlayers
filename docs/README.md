@@ -54,3 +54,6 @@ economy:
 ```
 
 Adjust the tick interval to change how frequently AI decisions execute, and toggle HTTP/OpenAI integrations as your backend services become available.
+
+## API integrations
+Detailed request documentation for the HTTP-based integrations lives in [`docs/api.md`](api.md), including example payloads and how many chat messages are forwarded to external services.

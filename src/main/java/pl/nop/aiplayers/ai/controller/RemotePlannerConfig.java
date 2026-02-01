@@ -11,6 +11,7 @@ public class RemotePlannerConfig {
     private final boolean enabled;
     private final String baseUrl;
     private final String planPath;
+    private final Duration connectTimeout;
     private final Duration requestTimeout;
     private final String serverId;
     private final String serverMode;
@@ -22,16 +23,19 @@ public class RemotePlannerConfig {
     private final List<String> personaStyleTags;
     private final List<String> personaAvoidTopics;
     private final String personaKnowledgeLevel;
+    private final int maxBotsPerPlayerMessage;
 
     public RemotePlannerConfig(FileConfiguration config) {
         this.enabled = config.getBoolean("ai.remote.enabled", false);
         this.baseUrl = config.getString("ai.remote.base-url", "");
         this.planPath = config.getString("ai.remote.plan-path", "/v1/plan");
-        this.requestTimeout = Duration.ofMillis(config.getLong("ai.remote.request-timeout-millis", 1500L));
+        this.connectTimeout = Duration.ofMillis(config.getLong("ai.remote.connect-timeout-millis", 2000L));
+        this.requestTimeout = Duration.ofMillis(config.getLong("ai.remote.request-timeout-millis", 5000L));
         this.serverId = config.getString("ai.remote.server-id", "betterbox-1");
         this.serverMode = config.getString("ai.remote.server-mode", "LOBBY");
         this.chatLimit = Math.max(1, config.getInt("ai.remote.chat-limit", 10));
         this.requestIntervalMillis = Math.max(30000L, config.getLong("ai.remote.request-interval-millis", 30000L));
+        this.maxBotsPerPlayerMessage = Math.max(1, config.getInt("ai.remote.max-bots-per-player-message", 2));
         this.settings = new PlannerSettings(
                 config.getInt("ai.remote.settings.max-actions", 3),
                 config.getInt("ai.remote.settings.min-delay-ms", 800),
@@ -63,6 +67,10 @@ public class RemotePlannerConfig {
 
     public String getPlanPath() {
         return planPath;
+    }
+
+    public Duration getConnectTimeout() {
+        return connectTimeout;
     }
 
     public Duration getRequestTimeout() {
@@ -107,5 +115,9 @@ public class RemotePlannerConfig {
 
     public String getPersonaKnowledgeLevel() {
         return personaKnowledgeLevel;
+    }
+
+    public int getMaxBotsPerPlayerMessage() {
+        return maxBotsPerPlayerMessage;
     }
 }

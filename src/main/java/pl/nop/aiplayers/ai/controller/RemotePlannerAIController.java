@@ -20,12 +20,17 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class RemotePlannerAIController implements AIController {
 
@@ -36,6 +41,9 @@ public class RemotePlannerAIController implements AIController {
     private final HttpClient httpClient;
     private final RemotePlannerConfig config;
     private final ConcurrentHashMap<UUID, Long> lastRequestMillis;
+    private final Object responderLock = new Object();
+    private volatile long responderSequence = -1L;
+    private volatile Set<UUID> responders = Collections.emptySet();
 
     public RemotePlannerAIController(Plugin plugin, AIChatService chatService, AIPlayerManager manager, RemotePlannerConfig config) {
         this.plugin = plugin;
@@ -44,7 +52,7 @@ public class RemotePlannerAIController implements AIController {
         this.config = config;
         this.gson = new Gson();
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(config.getRequestTimeout())
+                .connectTimeout(config.getConnectTimeout())
                 .build();
         this.lastRequestMillis = new ConcurrentHashMap<>();
     }
@@ -64,11 +72,14 @@ public class RemotePlannerAIController implements AIController {
         }
         String payload = gson.toJson(request);
         String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        long startMillis = System.currentTimeMillis();
         plugin.getLogger().info("Sending chat request to the server " + targetUrl + " for AIPlayer " + session.getProfile().getName());
         logToFile("Sending planner request " + request.requestId + " to " + targetUrl
                 + " for bot=" + session.getProfile().getName()
                 + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()));
         logToFile("Planner request " + request.requestId + " payload: " + payload);
+        logToFile("Planner request " + request.requestId + " timeouts: connect="
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
@@ -79,39 +90,48 @@ public class RemotePlannerAIController implements AIController {
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
+                    long durationMillis = System.currentTimeMillis() - startMillis;
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Planner API responded with status " + response.statusCode());
                         logToFile("Planner API responded with status " + response.statusCode()
-                                + " for request " + request.requestId);
+                                + " for request " + request.requestId
+                                + ", durationMs=" + durationMillis);
                         logToFile("Planner response " + request.requestId + " payload: " + response.body());
                         return null;
                     }
                     logToFile("Planner API responded with status " + response.statusCode()
                             + " for request " + request.requestId
+                            + ", durationMs=" + durationMillis
                             + ", payloadLength=" + response.body().length());
                     logToFile("Planner response " + request.requestId + " payload: " + response.body());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenCompose(response -> toActionFuture(session, response))
                 .exceptionally(ex -> {
-                    plugin.getLogger().warning("Planner API request failed: " + ex.getMessage());
-                    logToFile("Planner API request failed for " + request.requestId + ": " + ex.getMessage());
+                    String details = describeException(ex);
+                    long durationMillis = System.currentTimeMillis() - startMillis;
+                    String message = "Planner API request failed after " + durationMillis + "ms to " + targetUrl
+                            + " for request " + request.requestId + ": " + details;
+                    plugin.getLogger().warning(message);
+                    logToFile(message);
                     return Action.idle();
                 });
     }
 
     private boolean shouldSendRequest(AIPlayerSession session) {
         UUID botId = session.getProfile().getUuid();
-        long now = System.currentTimeMillis();
         long lastSent = lastRequestMillis.getOrDefault(botId, 0L);
-        long lastChatUpdate = chatService.getLastChatUpdateMillis();
-        boolean chatUpdated = lastChatUpdate > lastSent;
-        boolean intervalElapsed = now - lastSent >= config.getRequestIntervalMillis();
-        if (chatUpdated || intervalElapsed) {
-            lastRequestMillis.put(botId, now);
-            return true;
+        long lastPlayerChatUpdate = chatService.getLastPlayerChatUpdateMillis();
+        long lastPlayerSequence = chatService.getLastPlayerChatSequence();
+        if (lastPlayerChatUpdate <= 0 || lastPlayerChatUpdate <= lastSent) {
+            return false;
         }
-        return false;
+        updateResponders(lastPlayerSequence);
+        if (!responders.contains(botId)) {
+            return false;
+        }
+        lastRequestMillis.put(botId, System.currentTimeMillis());
+        return true;
     }
 
     private CompletableFuture<Action> toActionFuture(AIPlayerSession session, PlannerResponse response) {
@@ -128,9 +148,15 @@ public class RemotePlannerAIController implements AIController {
             return CompletableFuture.completedFuture(Action.idle());
         }
         long delay = Math.max(0, planned.sendAfterMs);
-        Action action = Action.say(planned.message);
+        String cleanedMessage = stripBotPrefix(planned.message, session.getProfile().getName());
+        cleanedMessage = pl.nop.aiplayers.chat.ChatMessageSanitizer.sanitizeOutgoing(cleanedMessage);
+        if (cleanedMessage.isBlank()) {
+            logToFile("Planner response message was empty after cleanup for bot " + session.getProfile().getName());
+            return CompletableFuture.completedFuture(Action.idle());
+        }
+        Action action = Action.say(cleanedMessage);
         logToFile("Planner response action for bot " + session.getProfile().getName()
-                + ": message='" + planned.message + "', sendAfterMs=" + planned.sendAfterMs);
+                + ": message='" + cleanedMessage + "', sendAfterMs=" + planned.sendAfterMs);
         if (delay <= 0) {
             return CompletableFuture.completedFuture(action);
         }
@@ -153,22 +179,24 @@ public class RemotePlannerAIController implements AIController {
         request.server.mode = config.getServerMode();
         request.server.onlinePlayers = Bukkit.getOnlinePlayers().size();
 
+        List<AIChatService.ChatEntry> chatEntries = chatService.getChatEntriesSnapshot();
+
         BotInfo bot = new BotInfo();
         bot.botId = session.getProfile().getUuid().toString();
         bot.name = session.getProfile().getName();
         bot.online = session.getNpcHandle().getLocation() != null;
         bot.cooldownMs = 0;
-        bot.persona = buildPersona(session.getProfile());
+        bot.persona = buildPersona(session.getProfile(), detectLanguage(chatEntries));
         request.bots = Collections.singletonList(bot);
 
-        request.chat = buildChat();
+        request.chat = buildChat(chatEntries);
         request.settings = config.getSettings();
         return request;
     }
 
-    private Persona buildPersona(AIPlayerProfile profile) {
+    private Persona buildPersona(AIPlayerProfile profile, String detectedLanguage) {
         Persona persona = new Persona();
-        persona.language = config.getPersonaLanguage();
+        persona.language = detectedLanguage != null ? detectedLanguage : config.getPersonaLanguage();
         persona.tone = config.getPersonaTone();
         persona.styleTags = new ArrayList<>(config.getPersonaStyleTags());
         persona.avoidTopics = new ArrayList<>(config.getPersonaAvoidTopics());
@@ -212,24 +240,132 @@ public class RemotePlannerAIController implements AIController {
         return tags;
     }
 
-    private List<ChatLine> buildChat() {
-        List<AIChatService.ChatEntry> entries = chatService.getChatEntriesSnapshot();
-        if (entries.isEmpty()) {
+    private List<ChatLine> buildChat(List<AIChatService.ChatEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
             return Collections.emptyList();
         }
         int limit = config.getChatLimit();
-        int start = Math.max(0, entries.size() - limit);
         List<ChatLine> chatLines = new ArrayList<>();
-        for (int i = start; i < entries.size(); i++) {
+        for (int i = entries.size() - 1; i >= 0 && chatLines.size() < limit; i--) {
             AIChatService.ChatEntry entry = entries.get(i);
+            if (entry.getSenderType() != AIChatService.ChatSenderType.PLAYER) {
+                continue;
+            }
             ChatLine line = new ChatLine();
             line.tsMs = entry.getTimestampMillis();
             line.sender = entry.getSender();
-            line.senderType = manager.getProfile(entry.getSender()) != null ? "BOT" : "PLAYER";
-            line.message = entry.getMessage();
+            line.senderType = "PLAYER";
+            line.message = sanitizeChatMessage(line.sender, line.senderType, entry.getMessage());
             chatLines.add(line);
         }
+        Collections.reverse(chatLines);
         return chatLines;
+    }
+
+    private String sanitizeChatMessage(String sender, String senderType, String message) {
+        if (message == null) {
+            return "";
+        }
+        if (!"BOT".equals(senderType)) {
+            return message;
+        }
+        return stripBotPrefix(message, sender);
+    }
+
+    private String stripBotPrefix(String message, String botName) {
+        if (message == null) {
+            return "";
+        }
+        String trimmed = message.trim();
+        String lower = trimmed.toLowerCase();
+        if (lower.startsWith("[bot]")) {
+            trimmed = trimmed.substring(5).trim();
+        }
+        if (botName == null || botName.isBlank()) {
+            return trimmed;
+        }
+        String botLower = botName.toLowerCase();
+        while (trimmed.toLowerCase().startsWith(botLower + ":")) {
+            trimmed = trimmed.substring(botName.length() + 1).trim();
+        }
+        return trimmed.trim();
+    }
+
+    private String detectLanguage(List<AIChatService.ChatEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return null;
+        }
+        int checked = 0;
+        for (int i = entries.size() - 1; i >= 0 && checked < config.getChatLimit(); i--) {
+            AIChatService.ChatEntry entry = entries.get(i);
+            if (entry.getSenderType() == AIChatService.ChatSenderType.BOT) {
+                continue;
+            }
+            String message = entry.getMessage();
+            if (message == null || message.isBlank()) {
+                continue;
+            }
+            String lower = message.toLowerCase();
+            if (containsPolishCharacters(lower) || containsPolishWords(lower)) {
+                return "pl";
+            }
+            if (containsEnglishWords(lower)) {
+                return "en";
+            }
+            checked++;
+        }
+        return null;
+    }
+
+    private boolean containsPolishCharacters(String text) {
+        return text.contains("ą") || text.contains("ć") || text.contains("ę")
+                || text.contains("ł") || text.contains("ń") || text.contains("ó")
+                || text.contains("ś") || text.contains("ż") || text.contains("ź");
+    }
+
+    private boolean containsPolishWords(String text) {
+        return text.contains("siemka") || text.contains("cześć") || text.contains("czesc")
+                || text.contains("dzięki") || text.contains("dzieki") || text.contains("proszę")
+                || text.contains("prosze") || text.contains("co tam") || text.contains("jakie")
+                || text.contains("wiadomo") || text.contains("grac");
+    }
+
+    private boolean containsEnglishWords(String text) {
+        return text.contains("hello") || text.contains("hi ") || text.contains("thanks")
+                || text.contains("what ") || text.contains("how are") || text.contains("you ")
+                || text.contains("newbie") || text.contains("learning");
+    }
+
+    private void updateResponders(long sequence) {
+        if (sequence <= 0 || sequence == responderSequence) {
+            return;
+        }
+        synchronized (responderLock) {
+            if (sequence == responderSequence) {
+                return;
+            }
+            List<AIPlayerSession> sessions = manager.getAllSessions().stream()
+                    .filter(session -> session.getNpcHandle().getLocation() != null)
+                    .sorted(Comparator.comparing(session -> session.getProfile().getName()))
+                    .toList();
+            if (sessions.isEmpty()) {
+                responders = Collections.emptySet();
+                responderSequence = sequence;
+                return;
+            }
+            List<AIPlayerSession> shuffled = new ArrayList<>(sessions);
+            Collections.shuffle(shuffled, ThreadLocalRandom.current());
+            int max = Math.max(1, config.getMaxBotsPerPlayerMessage());
+            Set<UUID> selected = new HashSet<>();
+            for (AIPlayerSession session : shuffled) {
+                selected.add(session.getProfile().getUuid());
+                if (selected.size() >= max) {
+                    break;
+                }
+            }
+            responders = Collections.unmodifiableSet(selected);
+            responderSequence = sequence;
+        }
     }
 
     private void logToFile(String message) {
@@ -244,6 +380,28 @@ public class RemotePlannerAIController implements AIController {
             return ((AIPlayersPlugin) plugin).getFileLogger();
         }
         return null;
+    }
+
+    private String describeException(Throwable ex) {
+        Throwable root = ex;
+        if (ex instanceof CompletionException && ex.getCause() != null) {
+            root = ex.getCause();
+        }
+        StringBuilder details = new StringBuilder(root.getClass().getSimpleName());
+        String message = root.getMessage();
+        if (message != null && !message.isBlank()) {
+            details.append(": ").append(message);
+        }
+        Throwable cause = root.getCause();
+        if (cause != null && cause != root) {
+            details.append(" (cause: ").append(cause.getClass().getSimpleName());
+            String causeMessage = cause.getMessage();
+            if (causeMessage != null && !causeMessage.isBlank()) {
+                details.append(": ").append(causeMessage);
+            }
+            details.append(")");
+        }
+        return details.toString();
     }
 
     private static class PlannerRequest {
@@ -308,5 +466,6 @@ public class RemotePlannerAIController implements AIController {
         @SerializedName("send_after_ms")
         private long sendAfterMs;
         private String message;
+        private String visibility;
     }
 }

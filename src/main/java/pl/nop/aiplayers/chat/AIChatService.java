@@ -14,31 +14,48 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class AIChatService {
 
     private final Plugin plugin;
     private final Deque<ChatEntry> chatHistory;
-    private final int maxSize;
-    private final long rateLimitMillis;
+    private int maxSize;
+    private long rateLimitMillis;
     private final Map<UUID, Long> lastMessageMillis = new ConcurrentHashMap<>();
+    private final AtomicLong sequenceCounter = new AtomicLong(0L);
     private volatile long lastChatUpdateMillis;
+    private volatile long lastPlayerChatUpdateMillis;
+    private volatile long lastPlayerChatSequence;
 
     public AIChatService(Plugin plugin, int maxSize, long rateLimitMillis) {
         this.plugin = plugin;
         this.chatHistory = new ArrayDeque<>();
-        this.maxSize = maxSize;
-        this.rateLimitMillis = rateLimitMillis;
+        this.maxSize = Math.max(1, maxSize);
+        this.rateLimitMillis = Math.max(0, rateLimitMillis);
     }
 
-    public synchronized void recordMessage(String message) {
+    public synchronized void recordMessage(String sender, String message, ChatSenderType senderType) {
         if (chatHistory.size() >= maxSize) {
             chatHistory.removeFirst();
         }
         long now = System.currentTimeMillis();
-        chatHistory.addLast(ChatEntry.fromLine(message, now));
+        long sequence = sequenceCounter.incrementAndGet();
+        chatHistory.addLast(ChatEntry.fromParts(sender, message, senderType, now, sequence));
         lastChatUpdateMillis = now;
-        logToFile("Recorded chat message: " + message);
+        if (senderType == ChatSenderType.PLAYER) {
+            lastPlayerChatUpdateMillis = now;
+            lastPlayerChatSequence = sequence;
+        }
+        logToFile("Recorded chat message: " + sender + ": " + message);
+    }
+
+    public synchronized void recordMessage(String message) {
+        if (message == null) {
+            return;
+        }
+        ChatEntry entry = ChatEntry.fromLine(message, System.currentTimeMillis());
+        recordMessage(entry.getSender(), entry.getMessage(), entry.getSenderType());
     }
 
     public synchronized List<String> getChatHistorySnapshot() {
@@ -53,12 +70,21 @@ public class AIChatService {
         return new ArrayList<>(chatHistory);
     }
 
+    public synchronized void updateSettings(int newMaxSize, long newRateLimitMillis) {
+        this.maxSize = Math.max(1, newMaxSize);
+        this.rateLimitMillis = Math.max(0, newRateLimitMillis);
+        while (chatHistory.size() > maxSize) {
+            chatHistory.removeFirst();
+        }
+    }
+
     public void sendChatMessage(AIPlayerSession session, String message) {
         if (!Bukkit.isPrimaryThread()) {
             Bukkit.getScheduler().runTask(plugin, () -> sendChatMessage(session, message));
             return;
         }
-        if (message == null || message.isBlank()) {
+        String sanitized = ChatMessageSanitizer.sanitizeOutgoing(message);
+        if (sanitized.isBlank()) {
             return;
         }
         long now = System.currentTimeMillis();
@@ -67,14 +93,22 @@ public class AIChatService {
             return;
         }
         lastMessageMillis.put(session.getProfile().getUuid(), now);
-        String formatted = ChatColor.GRAY + "<" + session.getProfile().getName() + "> " + ChatColor.WHITE + message;
+        String formatted = ChatColor.GRAY + "<" + session.getProfile().getName() + "> " + ChatColor.WHITE + sanitized;
         Bukkit.broadcastMessage(formatted);
-        recordMessage(session.getProfile().getName() + ": " + message);
-        logToFile("AIPlayer " + session.getProfile().getName() + " sent chat message: " + message);
+        recordMessage(session.getProfile().getName(), sanitized, ChatSenderType.BOT);
+        logToFile("AIPlayer " + session.getProfile().getName() + " sent chat message: " + sanitized);
     }
 
     public long getLastChatUpdateMillis() {
         return lastChatUpdateMillis;
+    }
+
+    public long getLastPlayerChatUpdateMillis() {
+        return lastPlayerChatUpdateMillis;
+    }
+
+    public long getLastPlayerChatSequence() {
+        return lastPlayerChatSequence;
     }
 
     private void logToFile(String message) {
@@ -96,28 +130,41 @@ public class AIChatService {
         private final long timestampMillis;
         private final String sender;
         private final String message;
+        private final ChatSenderType senderType;
+        private final long sequence;
 
-        private ChatEntry(String rawLine, long timestampMillis, String sender, String message) {
+        private ChatEntry(String rawLine, long timestampMillis, String sender, String message, ChatSenderType senderType,
+                          long sequence) {
             this.rawLine = rawLine;
             this.timestampMillis = timestampMillis;
             this.sender = sender;
             this.message = message;
+            this.senderType = senderType;
+            this.sequence = sequence;
+        }
+
+        public static ChatEntry fromParts(String sender, String message, ChatSenderType senderType,
+                                          long timestampMillis, long sequence) {
+            String safeSender = sender == null || sender.isBlank() ? "unknown" : sender.trim();
+            String safeMessage = message == null ? "" : message.trim();
+            String rawLine = safeSender + ": " + safeMessage;
+            return new ChatEntry(rawLine, timestampMillis, safeSender, safeMessage, senderType, sequence);
         }
 
         public static ChatEntry fromLine(String rawLine, long timestampMillis) {
             if (rawLine == null) {
-                return new ChatEntry("", timestampMillis, "unknown", "");
+                return new ChatEntry("", timestampMillis, "unknown", "", ChatSenderType.UNKNOWN, 0L);
             }
             int idx = rawLine.indexOf(":");
             if (idx <= 0 || idx >= rawLine.length() - 1) {
-                return new ChatEntry(rawLine, timestampMillis, "unknown", rawLine.trim());
+                return new ChatEntry(rawLine, timestampMillis, "unknown", rawLine.trim(), ChatSenderType.UNKNOWN, 0L);
             }
             String sender = rawLine.substring(0, idx).trim();
             String message = rawLine.substring(idx + 1).trim();
             if (sender.isEmpty()) {
                 sender = "unknown";
             }
-            return new ChatEntry(rawLine, timestampMillis, sender, message);
+            return new ChatEntry(rawLine, timestampMillis, sender, message, ChatSenderType.UNKNOWN, 0L);
         }
 
         public String getRawLine() {
@@ -135,5 +182,19 @@ public class AIChatService {
         public String getMessage() {
             return message;
         }
+
+        public ChatSenderType getSenderType() {
+            return senderType;
+        }
+
+        public long getSequence() {
+            return sequence;
+        }
+    }
+
+    public enum ChatSenderType {
+        PLAYER,
+        BOT,
+        UNKNOWN
     }
 }
