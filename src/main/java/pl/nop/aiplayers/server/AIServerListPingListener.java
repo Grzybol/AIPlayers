@@ -17,7 +17,7 @@ public class AIServerListPingListener implements Listener {
 
     @EventHandler
     public void onServerListPing(PaperServerListPingEvent event) {
-        updatePingCount(event.getNumPlayers(), count -> event.setNumPlayers(count));
+        updatePingCount(count -> event.setNumPlayers(count), event::getMaxPlayers, event::setMaxPlayers);
     }
 
     @EventHandler
@@ -25,43 +25,31 @@ public class AIServerListPingListener implements Listener {
         updatePingCount(event);
     }
 
-    private void updatePingCount(int currentPlayers, java.util.function.IntConsumer updateFn) {
+    private void updatePingCount(java.util.function.IntConsumer updateFn,
+                                 java.util.function.IntSupplier maxSupplier,
+                                 java.util.function.IntConsumer maxUpdater) {
         if (aiPlayerManager == null) {
             return;
         }
-        int aiCount = aiPlayerManager.getOnlineSessionCount();
-        if (aiCount <= 0) {
-            return;
+        int totalPlayers = aiPlayerManager.getTotalOnlineCount();
+        updateFn.accept(totalPlayers);
+        if (maxSupplier != null && maxUpdater != null && totalPlayers > maxSupplier.getAsInt()) {
+            maxUpdater.accept(totalPlayers);
         }
-        updateFn.accept(currentPlayers + aiCount);
     }
 
     private void updatePingCount(ServerListPingEvent event) {
         if (aiPlayerManager == null) {
             return;
         }
-        int aiCount = aiPlayerManager.getOnlineSessionCount();
-        if (aiCount <= 0) {
+        int totalPlayers = aiPlayerManager.getTotalOnlineCount();
+        if (!setNumPlayers(event, totalPlayers)) {
+            event.setMaxPlayers(Math.max(event.getMaxPlayers(), totalPlayers));
             return;
         }
-        int currentPlayers = getNumPlayers(event);
-        int updatedPlayers = currentPlayers + aiCount;
-        if (!setNumPlayers(event, updatedPlayers)) {
-            event.setMaxPlayers(Math.max(event.getMaxPlayers(), updatedPlayers));
+        if (totalPlayers > event.getMaxPlayers()) {
+            event.setMaxPlayers(totalPlayers);
         }
-    }
-
-    private int getNumPlayers(ServerListPingEvent event) {
-        try {
-            Method method = event.getClass().getMethod("getNumPlayers");
-            Object value = method.invoke(event);
-            if (value instanceof Integer) {
-                return (Integer) value;
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // Ignore and fall back to 0.
-        }
-        return 0;
     }
 
     private boolean setNumPlayers(ServerListPingEvent event, int count) {
