@@ -16,12 +16,12 @@ public class AIServerListPingListener implements Listener {
 
     @EventHandler
     public void onServerListPing(PaperServerListPingEvent event) {
-        updatePingCount(event.getNumPlayers(), event::setNumPlayers);
+        updatePingCount(event.getNumPlayers(), count -> event.setNumPlayers(count));
     }
 
     @EventHandler
     public void onServerListPing(ServerListPingEvent event) {
-        updatePingCount(event.getNumPlayers(), event::setNumPlayers);
+        updatePingCount(event.getNumPlayers(), count -> event.setNumPlayers(count));
     }
 
     private void updatePingCount(int currentPlayers, java.util.function.IntConsumer updateFn) {
