@@ -168,9 +168,7 @@ public class AIPlayerManager {
     }
 
     public synchronized int getOnlineSessionCount() {
-        return (int) sessions.values().stream()
-                .filter(session -> session.getNpcHandle().getLocation() != null)
-                .count();
+        return sessions.size();
     }
 
     public synchronized Collection<AIPlayerProfile> getAllProfiles() {
