@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -71,11 +72,14 @@ public class RemotePlannerAIController implements AIController {
         }
         String payload = gson.toJson(request);
         String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        long startMillis = System.currentTimeMillis();
         plugin.getLogger().info("Sending chat request to the server " + targetUrl + " for AIPlayer " + session.getProfile().getName());
         logToFile("Sending planner request " + request.requestId + " to " + targetUrl
                 + " for bot=" + session.getProfile().getName()
                 + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()));
         logToFile("Planner request " + request.requestId + " payload: " + payload);
+        logToFile("Planner request " + request.requestId + " timeouts: connect="
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .timeout(config.getRequestTimeout())
@@ -86,23 +90,30 @@ public class RemotePlannerAIController implements AIController {
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
+                    long durationMillis = System.currentTimeMillis() - startMillis;
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Planner API responded with status " + response.statusCode());
                         logToFile("Planner API responded with status " + response.statusCode()
-                                + " for request " + request.requestId);
+                                + " for request " + request.requestId
+                                + ", durationMs=" + durationMillis);
                         logToFile("Planner response " + request.requestId + " payload: " + response.body());
                         return null;
                     }
                     logToFile("Planner API responded with status " + response.statusCode()
                             + " for request " + request.requestId
+                            + ", durationMs=" + durationMillis
                             + ", payloadLength=" + response.body().length());
                     logToFile("Planner response " + request.requestId + " payload: " + response.body());
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenCompose(response -> toActionFuture(session, response))
                 .exceptionally(ex -> {
-                    plugin.getLogger().warning("Planner API request failed: " + ex.getMessage());
-                    logToFile("Planner API request failed for " + request.requestId + ": " + ex.getMessage());
+                    String details = describeException(ex);
+                    long durationMillis = System.currentTimeMillis() - startMillis;
+                    String message = "Planner API request failed after " + durationMillis + "ms to " + targetUrl
+                            + " for request " + request.requestId + ": " + details;
+                    plugin.getLogger().warning(message);
+                    logToFile(message);
                     return Action.idle();
                 });
     }
@@ -369,6 +380,28 @@ public class RemotePlannerAIController implements AIController {
             return ((AIPlayersPlugin) plugin).getFileLogger();
         }
         return null;
+    }
+
+    private String describeException(Throwable ex) {
+        Throwable root = ex;
+        if (ex instanceof CompletionException && ex.getCause() != null) {
+            root = ex.getCause();
+        }
+        StringBuilder details = new StringBuilder(root.getClass().getSimpleName());
+        String message = root.getMessage();
+        if (message != null && !message.isBlank()) {
+            details.append(": ").append(message);
+        }
+        Throwable cause = root.getCause();
+        if (cause != null && cause != root) {
+            details.append(" (cause: ").append(cause.getClass().getSimpleName());
+            String causeMessage = cause.getMessage();
+            if (causeMessage != null && !causeMessage.isBlank()) {
+                details.append(": ").append(causeMessage);
+            }
+            details.append(")");
+        }
+        return details.toString();
     }
 
     private static class PlannerRequest {
