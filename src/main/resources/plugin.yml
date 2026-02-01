@@ -6,6 +6,7 @@ author: "nop"
 description: "AI-controlled player-like agents with inventory, chat and economy."
 softdepend:
   - Essentials
+  - PlaceholderAPI
   - ProtocolLib
   - Vault
 commands:
