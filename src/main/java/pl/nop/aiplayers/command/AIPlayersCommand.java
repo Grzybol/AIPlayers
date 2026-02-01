@@ -67,6 +67,11 @@ public class AIPlayersCommand implements CommandExecutor {
             return;
         }
         String name = args[1];
+        if (name.length() > AIPlayerManager.MAX_NAME_LENGTH) {
+            sender.sendMessage(ChatColor.RED + "AI player name cannot be longer than "
+                    + AIPlayerManager.MAX_NAME_LENGTH + " characters.");
+            return;
+        }
         double radius;
         try {
             radius = Double.parseDouble(args[2]);

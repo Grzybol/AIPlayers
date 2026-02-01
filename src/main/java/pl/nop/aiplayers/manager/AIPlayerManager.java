@@ -23,6 +23,7 @@ import java.util.UUID;
 
 public class AIPlayerManager {
 
+    public static final int MAX_NAME_LENGTH = 16;
     private final Plugin plugin;
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
@@ -77,6 +78,11 @@ public class AIPlayerManager {
             if (sessions.containsKey(profile.getName())) {
                 continue;
             }
+            if (profile.getName().length() > MAX_NAME_LENGTH) {
+                plugin.getLogger().warning("Skipping AI player " + profile.getName()
+                        + " because name exceeds " + MAX_NAME_LENGTH + " characters.");
+                continue;
+            }
             Location spawnLocation = profile.getLastKnownLocation();
             if (spawnLocation == null) {
                 spawnLocation = profile.getSpawnLocation();
@@ -104,6 +110,11 @@ public class AIPlayerManager {
     }
 
     public synchronized AIPlayerSession spawnAIPlayer(String name, Location spawnLocation, double roamRadius, String chatInstruction) {
+        if (name.length() > MAX_NAME_LENGTH) {
+            plugin.getLogger().warning("Skipping AI player spawn for " + name
+                    + " because name exceeds " + MAX_NAME_LENGTH + " characters.");
+            return null;
+        }
         AIPlayerProfile profile = profiles.get(name);
         if (profile == null) {
             profile = createProfile(name, spawnLocation, roamRadius, chatInstruction);
