@@ -55,3 +55,10 @@ chat:
     chat-history-limit: 10
 economy:
   enabled: true
+velocity:
+  bridge:
+    enabled: true
+    channel: "aiplayers:count"
+    heartbeat-seconds: 10
+    server-id: ""
+    max-players-override: 0

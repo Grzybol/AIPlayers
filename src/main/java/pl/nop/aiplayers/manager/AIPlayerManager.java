@@ -137,6 +137,7 @@ public class AIPlayerManager {
         sessions.put(name, session);
         plugin.getLogger().info("Spawned AI player " + name + " at " + locationToString(spawnLocation));
         logToFile("Spawned AI player " + name + " at " + locationToString(spawnLocation));
+        notifyVelocityBridge();
         return session;
     }
 
@@ -146,6 +147,7 @@ public class AIPlayerManager {
             session.getNpcHandle().despawn();
             plugin.getLogger().info("Despawned AI player " + name);
             logToFile("Despawned AI player " + name);
+            notifyVelocityBridge();
         }
     }
 
@@ -169,6 +171,18 @@ public class AIPlayerManager {
 
     public synchronized int getOnlineSessionCount() {
         return sessions.size();
+    }
+
+    public synchronized int getOnlineHumansCount() {
+        return Bukkit.getOnlinePlayers().size();
+    }
+
+    public synchronized int getOnlineAICount() {
+        return sessions.size();
+    }
+
+    public synchronized int getOnlineTotalCount() {
+        return Bukkit.getOnlinePlayers().size() + sessions.size();
     }
 
     public synchronized int getTotalOnlineCount() {
@@ -201,6 +215,12 @@ public class AIPlayerManager {
         AIPlayersFileLogger fileLogger = getFileLogger();
         if (fileLogger != null) {
             fileLogger.info(message);
+        }
+    }
+
+    private void notifyVelocityBridge() {
+        if (plugin instanceof AIPlayersPlugin) {
+            ((AIPlayersPlugin) plugin).requestVelocityBridgeUpdate();
         }
     }
 
