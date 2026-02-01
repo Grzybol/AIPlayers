@@ -26,6 +26,8 @@ import pl.nop.aiplayers.placeholder.AIPlayersPlaceholderExpansion;
 import pl.nop.aiplayers.server.AIServerListPingListener;
 import pl.nop.aiplayers.storage.AIPlayerStorage;
 import pl.nop.aiplayers.task.AITickTask;
+import pl.nop.aiplayers.velocity.VelocityBridgeConfig;
+import pl.nop.aiplayers.velocity.VelocityPlayerCountBridge;
 
 public class AIPlayersPlugin extends JavaPlugin {
 
@@ -38,6 +40,7 @@ public class AIPlayersPlugin extends JavaPlugin {
     private AIPlayersFileLogger fileLogger;
     private ChatEngagementService engagementService;
     private BukkitTask tickTask;
+    private VelocityPlayerCountBridge velocityBridge;
 
     @Override
     public void onEnable() {
@@ -81,6 +84,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         registerCommands();
         registerListeners();
         registerPlaceholders();
+        initializeVelocityBridge();
         startTickTask();
 
         getLogger().info("AIPlayers enabled with tick interval " + config.getInt("ai.tick-interval-ticks", 10));
@@ -120,6 +124,9 @@ public class AIPlayersPlugin extends JavaPlugin {
                 session.getProfile().setLastKnownLocation(session.getNpcHandle().getLocation()));
         storage.saveAll(aiPlayerManager.getAllProfiles());
         aiPlayerManager.despawnAll();
+        if (velocityBridge != null) {
+            velocityBridge.shutdown();
+        }
         getLogger().info("AIPlayers disabled");
         if (fileLogger != null) {
             fileLogger.info("AIPlayers disabled.");
@@ -150,6 +157,12 @@ public class AIPlayersPlugin extends JavaPlugin {
         return storage;
     }
 
+    public void requestVelocityBridgeUpdate() {
+        if (velocityBridge != null) {
+            velocityBridge.requestImmediateUpdate();
+        }
+    }
+
     public void reloadPluginConfig() {
         reloadConfig();
         FileConfiguration config = getConfig();
@@ -172,6 +185,7 @@ public class AIPlayersPlugin extends JavaPlugin {
             defaultController = AIControllerType.REMOTE;
         }
         aiPlayerManager.updateDefaults(defaultController, defaultBehavior);
+        initializeVelocityBridge();
         if (tickTask != null) {
             tickTask.cancel();
         }
@@ -216,6 +230,15 @@ public class AIPlayersPlugin extends JavaPlugin {
             getLogger().info(message);
             fileLogger.info(message);
         }
+    }
+
+    private void initializeVelocityBridge() {
+        VelocityBridgeConfig velocityConfig = new VelocityBridgeConfig(getConfig());
+        if (velocityBridge != null) {
+            velocityBridge.shutdown();
+        }
+        velocityBridge = new VelocityPlayerCountBridge(this, aiPlayerManager, velocityConfig);
+        velocityBridge.start();
     }
 
     private AIControllerType parseControllerType(String value) {
