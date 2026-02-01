@@ -22,6 +22,7 @@ import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIBehaviorMode;
 import pl.nop.aiplayers.model.AIControllerType;
 import pl.nop.aiplayers.npc.NPCJoinListener;
+import pl.nop.aiplayers.placeholder.AIPlayersPlaceholderExpansion;
 import pl.nop.aiplayers.server.AIServerListPingListener;
 import pl.nop.aiplayers.storage.AIPlayerStorage;
 import pl.nop.aiplayers.task.AITickTask;
@@ -79,6 +80,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         restoreSessions();
         registerCommands();
         registerListeners();
+        registerPlaceholders();
         startTickTask();
 
         getLogger().info("AIPlayers enabled with tick interval " + config.getInt("ai.tick-interval-ticks", 10));
@@ -96,6 +98,14 @@ public class AIPlayersPlugin extends JavaPlugin {
         pluginManager.registerEvents(new AIChatListener(this, chatService), this);
         pluginManager.registerEvents(new NPCJoinListener(this, aiPlayerManager), this);
         pluginManager.registerEvents(new AIServerListPingListener(aiPlayerManager), this);
+    }
+
+    private void registerPlaceholders() {
+        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            new AIPlayersPlaceholderExpansion(aiPlayerManager, getDescription().getVersion()).register();
+            getLogger().info("Registered PlaceholderAPI expansion aiplayers.");
+            fileLogger.info("Registered PlaceholderAPI expansion aiplayers.");
+        }
     }
 
     private void startTickTask() {
