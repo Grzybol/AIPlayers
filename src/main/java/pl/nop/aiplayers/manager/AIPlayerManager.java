@@ -171,6 +171,10 @@ public class AIPlayerManager {
         return sessions.size();
     }
 
+    public synchronized int getTotalOnlineCount() {
+        return Bukkit.getOnlinePlayers().size() + sessions.size();
+    }
+
     public synchronized Collection<AIPlayerProfile> getAllProfiles() {
         return Collections.unmodifiableCollection(profiles.values());
     }

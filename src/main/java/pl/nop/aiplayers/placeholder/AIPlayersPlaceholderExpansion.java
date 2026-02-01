@@ -40,13 +40,17 @@ public class AIPlayersPlaceholderExpansion extends PlaceholderExpansion {
         if (aiPlayerManager == null) {
             return "0";
         }
-        if ("bots".equalsIgnoreCase(params) || "online".equalsIgnoreCase(params)) {
+        if ("bots".equalsIgnoreCase(params) || "bot".equalsIgnoreCase(params) || "online_bots".equalsIgnoreCase(params)) {
             return String.valueOf(aiPlayerManager.getOnlineSessionCount());
         }
-        if ("online_total".equalsIgnoreCase(params) || "total_online".equalsIgnoreCase(params)) {
-            int bots = aiPlayerManager.getOnlineSessionCount();
-            int humans = Bukkit.getOnlinePlayers().size();
-            return String.valueOf(humans + bots);
+        if ("online".equalsIgnoreCase(params)
+                || "online_total".equalsIgnoreCase(params)
+                || "total_online".equalsIgnoreCase(params)
+                || "total".equalsIgnoreCase(params)) {
+            return String.valueOf(aiPlayerManager.getTotalOnlineCount());
+        }
+        if ("humans".equalsIgnoreCase(params) || "players".equalsIgnoreCase(params)) {
+            return String.valueOf(Bukkit.getOnlinePlayers().size());
         }
         return null;
     }

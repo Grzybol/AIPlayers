@@ -28,5 +28,6 @@ Plugin działa wyłącznie lokalnie i nie komunikuje się z żadnymi zewnętrzny
 ## PlaceholderAPI
 Jeżeli na serwerze działa PlaceholderAPI, plugin rejestruje ekspansję `aiplayers` z następującymi placeholderami:
 
-- `%aiplayers_bots%` / `%aiplayers_online%` – liczba aktywnych botów.
-- `%aiplayers_online_total%` / `%aiplayers_total_online%` – suma graczy online + botów.
+- `%aiplayers_bots%` / `%aiplayers_online_bots%` – liczba aktywnych botów.
+- `%aiplayers_online%` / `%aiplayers_online_total%` / `%aiplayers_total_online%` / `%aiplayers_total%` – suma graczy online + botów.
+- `%aiplayers_humans%` / `%aiplayers_players%` – liczba graczy online bez botów.
