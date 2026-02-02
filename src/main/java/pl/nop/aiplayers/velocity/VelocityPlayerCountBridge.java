@@ -93,9 +93,9 @@ public class VelocityPlayerCountBridge {
             logDebug("Skipping sendUpdate because bridge disabled.");
             return;
         }
-        Player player = getAnyPlayer();
+        Player player = getHumanPlayerForMessaging();
         if (player == null) {
-            logDebug("Skipping sendUpdate because no online players are available for plugin messaging.");
+            logDebug("Skipping sendUpdate because no human players are available for plugin messaging.");
             return;
         }
         int humans = manager.getOnlineHumansCount();
@@ -121,12 +121,17 @@ public class VelocityPlayerCountBridge {
         }
     }
 
-    private Player getAnyPlayer() {
+    private Player getHumanPlayerForMessaging() {
         Collection<? extends Player> players = Bukkit.getOnlinePlayers();
         if (players.isEmpty()) {
             return null;
         }
-        return players.iterator().next();
+        for (Player player : players) {
+            if (manager.getSession(player.getName()) == null) {
+                return player;
+            }
+        }
+        return null;
     }
 
     private void logFailure(String message) {
