@@ -99,7 +99,7 @@ public class VelocityPlayerCountBridge {
             return;
         }
         int humans = manager.getOnlineHumansCount();
-        int ai = manager.getOnlineAICount();
+        int ai = manager.getLoadedBotCount();
         int total = humans + ai;
         logDebug("Preparing payload: humans=" + humans + ", ai=" + ai + ", total=" + total);
         CountPayload payload = new CountPayload(

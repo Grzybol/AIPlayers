@@ -31,7 +31,7 @@ public class AIServerListPingListener implements Listener {
         if (aiPlayerManager == null) {
             return;
         }
-        int totalPlayers = aiPlayerManager.getTotalOnlineCount();
+        int totalPlayers = aiPlayerManager.getReportedPlayerCount();
         updateFn.accept(totalPlayers);
         if (maxSupplier != null && maxUpdater != null && totalPlayers > maxSupplier.getAsInt()) {
             maxUpdater.accept(totalPlayers);
@@ -42,7 +42,7 @@ public class AIServerListPingListener implements Listener {
         if (aiPlayerManager == null) {
             return;
         }
-        int totalPlayers = aiPlayerManager.getTotalOnlineCount();
+        int totalPlayers = aiPlayerManager.getReportedPlayerCount();
         if (!setNumPlayers(event, totalPlayers)) {
             event.setMaxPlayers(Math.max(event.getMaxPlayers(), totalPlayers));
             return;
