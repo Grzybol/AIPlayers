@@ -62,3 +62,4 @@ velocity:
     heartbeat-seconds: 10
     server-id: ""
     max-players-override: 0
+    auth-token: ""
