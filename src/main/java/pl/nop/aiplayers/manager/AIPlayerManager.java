@@ -28,6 +28,7 @@ public class AIPlayerManager {
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
     private final AIEconomyService economyService;
+    private int loadedBotCount;
     private AIControllerType defaultControllerType;
     private AIBehaviorMode defaultBehaviorMode;
 
@@ -56,6 +57,7 @@ public class AIPlayerManager {
         AIPlayerProfile profile = new AIPlayerProfile(uuid, name, defaultControllerType, defaultBehaviorMode,
                 location.clone(), location.clone(), roamRadius, chatInstruction);
         profiles.put(name, profile);
+        loadedBotCount++;
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Created AI player profile for " + name);
         logToFile("Created AI player profile for " + name + " (uuid=" + uuid + ")");
@@ -67,6 +69,7 @@ public class AIPlayerManager {
             return;
         }
         profiles.put(profile.getName(), profile);
+        loadedBotCount++;
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Loaded AI player profile for " + profile.getName());
         logToFile("Loaded AI player profile for " + profile.getName() + " (uuid=" + profile.getUuid() + ")");
@@ -153,7 +156,9 @@ public class AIPlayerManager {
 
     public synchronized void removeAIPlayer(String name) {
         despawnAIPlayer(name);
-        profiles.remove(name);
+        if (profiles.remove(name) != null) {
+            loadedBotCount = Math.max(0, loadedBotCount - 1);
+        }
         logToFile("Removed AI player profile " + name);
     }
 
@@ -182,7 +187,7 @@ public class AIPlayerManager {
     }
 
     public synchronized int getLoadedBotCount() {
-        return profiles.size();
+        return loadedBotCount;
     }
 
     public synchronized int getOnlineTotalCount() {
