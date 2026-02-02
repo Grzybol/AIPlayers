@@ -47,7 +47,7 @@ public class AIPlayersPlaceholderExpansion extends PlaceholderExpansion {
                 || "online_total".equalsIgnoreCase(params)
                 || "total_online".equalsIgnoreCase(params)
                 || "total".equalsIgnoreCase(params)) {
-            return String.valueOf(aiPlayerManager.getTotalOnlineCount());
+            return String.valueOf(aiPlayerManager.getReportedPlayerCount());
         }
         if ("humans".equalsIgnoreCase(params) || "players".equalsIgnoreCase(params)) {
             return String.valueOf(Bukkit.getOnlinePlayers().size());
