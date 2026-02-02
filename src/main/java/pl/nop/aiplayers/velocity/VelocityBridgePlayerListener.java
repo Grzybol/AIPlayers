@@ -16,6 +16,7 @@ public class VelocityBridgePlayerListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         bridge.logDebug("Player join detected (" + event.getPlayer().getName() + "), triggering immediate update.");
+        bridge.flushPendingPayload(event.getPlayer());
         bridge.requestImmediateUpdate();
     }
 

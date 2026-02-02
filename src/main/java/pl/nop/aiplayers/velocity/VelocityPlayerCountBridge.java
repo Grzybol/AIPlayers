@@ -23,6 +23,7 @@ public class VelocityPlayerCountBridge {
     private final VelocityBridgeConfig config;
     private final Gson gson;
     private final AtomicLong lastErrorLogAt;
+    private byte[] pendingPayload;
     private BukkitTask heartbeatTask;
     private VelocityBridgePlayerListener listener;
 
@@ -109,18 +110,37 @@ public class VelocityPlayerCountBridge {
         String json = gson.toJson(payload);
         logDebug("Serialized Velocity payload (" + json.length() + " bytes) for channel " + config.getChannel() + ".");
         byte[] message = json.getBytes(StandardCharsets.UTF_8);
-        Player player = getPlayerForMessaging();
         try {
-            if (player != null) {
-                player.sendPluginMessage(plugin, config.getChannel(), message);
-                logDebug("Velocity payload sent via player " + player.getName() + ".");
-            } else {
-                plugin.getServer().sendPluginMessage(plugin, config.getChannel(), message);
-                logDebug("Velocity payload sent via server (no players online).");
-            }
+            sendPayload(message);
         } catch (Exception ex) {
             logFailure("Failed to send Velocity bridge update: " + ex.getMessage());
         }
+    }
+
+    void flushPendingPayload(Player player) {
+        if (pendingPayload == null || player == null) {
+            return;
+        }
+        try {
+            player.sendPluginMessage(plugin, config.getChannel(), pendingPayload);
+            logDebug("Flushed pending Velocity payload via player " + player.getName() + ".");
+            pendingPayload = null;
+        } catch (Exception ex) {
+            logFailure("Failed to flush pending Velocity payload: " + ex.getMessage());
+        }
+    }
+
+    private void sendPayload(byte[] message) {
+        Player player = getPlayerForMessaging();
+        if (player != null) {
+            player.sendPluginMessage(plugin, config.getChannel(), message);
+            logDebug("Velocity payload sent via player " + player.getName() + ".");
+            pendingPayload = null;
+            return;
+        }
+        plugin.getServer().sendPluginMessage(plugin, config.getChannel(), message);
+        pendingPayload = message;
+        logDebug("Velocity payload sent via server (no players online). Cached payload for next join.");
     }
 
     private Player getPlayerForMessaging() {
