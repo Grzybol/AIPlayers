@@ -93,11 +93,6 @@ public class VelocityPlayerCountBridge {
             logDebug("Skipping sendUpdate because bridge disabled.");
             return;
         }
-        Player player = getPlayerForMessaging();
-        if (player == null) {
-            logDebug("Skipping sendUpdate because no players are available for plugin messaging.");
-            return;
-        }
         int humans = manager.getOnlineHumansCount();
         int ai = manager.getLoadedBotCount();
         int total = humans + ai;
@@ -113,9 +108,16 @@ public class VelocityPlayerCountBridge {
         );
         String json = gson.toJson(payload);
         logDebug("Serialized Velocity payload (" + json.length() + " bytes) for channel " + config.getChannel() + ".");
+        byte[] message = json.getBytes(StandardCharsets.UTF_8);
+        Player player = getPlayerForMessaging();
         try {
-            player.sendPluginMessage(plugin, config.getChannel(), json.getBytes(StandardCharsets.UTF_8));
-            logDebug("Velocity payload sent via player " + player.getName() + ".");
+            if (player != null) {
+                player.sendPluginMessage(plugin, config.getChannel(), message);
+                logDebug("Velocity payload sent via player " + player.getName() + ".");
+            } else {
+                plugin.getServer().sendPluginMessage(plugin, config.getChannel(), message);
+                logDebug("Velocity payload sent via server (no players online).");
+            }
         } catch (Exception ex) {
             logFailure("Failed to send Velocity bridge update: " + ex.getMessage());
         }
