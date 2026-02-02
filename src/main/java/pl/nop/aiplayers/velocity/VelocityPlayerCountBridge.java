@@ -94,7 +94,8 @@ public class VelocityPlayerCountBridge {
                 humans,
                 ai,
                 total,
-                config.getMaxPlayersOverride()
+                config.getMaxPlayersOverride(),
+                config.getAuthToken()
         );
         String json = gson.toJson(payload);
         try {
@@ -146,15 +147,18 @@ public class VelocityPlayerCountBridge {
         private final int onlineTotal;
         @SerializedName("max_players_override")
         private final int maxPlayersOverride;
+        @SerializedName("auth")
+        private final String auth;
 
         private CountPayload(String serverId, long timestampMs, int onlineHumans, int onlineAi, int onlineTotal,
-                             int maxPlayersOverride) {
+                             int maxPlayersOverride, String auth) {
             this.serverId = serverId;
             this.timestampMs = timestampMs;
             this.onlineHumans = onlineHumans;
             this.onlineAi = onlineAi;
             this.onlineTotal = onlineTotal;
             this.maxPlayersOverride = maxPlayersOverride;
+            this.auth = auth;
         }
     }
 }

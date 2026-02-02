@@ -9,6 +9,7 @@ public class VelocityBridgeConfig {
     private final int heartbeatSeconds;
     private final String serverId;
     private final int maxPlayersOverride;
+    private final String authToken;
 
     public VelocityBridgeConfig(FileConfiguration config) {
         this.enabled = config.getBoolean("velocity.bridge.enabled", true);
@@ -24,6 +25,11 @@ public class VelocityBridgeConfig {
         }
         this.serverId = configuredServerId;
         this.maxPlayersOverride = Math.max(0, config.getInt("velocity.bridge.max-players-override", 0));
+        String configuredAuthToken = config.getString("velocity.bridge.auth-token", "");
+        if (configuredAuthToken == null) {
+            configuredAuthToken = "";
+        }
+        this.authToken = configuredAuthToken;
     }
 
     public boolean isEnabled() {
@@ -44,5 +50,9 @@ public class VelocityBridgeConfig {
 
     public int getMaxPlayersOverride() {
         return maxPlayersOverride;
+    }
+
+    public String getAuthToken() {
+        return authToken;
     }
 }
