@@ -119,7 +119,7 @@ public class VelocityPlayerCountBridge {
             plugin.getLogger().warning(message);
             AIPlayersFileLogger fileLogger = plugin.getFileLogger();
             if (fileLogger != null) {
-                fileLogger.warning(message);
+                fileLogger.warn(message);
             }
         }
     }
