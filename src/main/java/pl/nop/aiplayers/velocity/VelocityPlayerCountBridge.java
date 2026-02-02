@@ -36,19 +36,26 @@ public class VelocityPlayerCountBridge {
 
     public void start() {
         if (!config.isEnabled()) {
+            logDebug("Velocity bridge start skipped (disabled).");
             return;
         }
         PluginManager pluginManager = plugin.getServer().getPluginManager();
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, config.getChannel());
         listener = new VelocityBridgePlayerListener(this);
         pluginManager.registerEvents(listener, plugin);
+        logDebug("Registered outgoing plugin channel " + config.getChannel() + " and player listener.");
         scheduleHeartbeat();
         requestImmediateUpdate();
         logInfo("Velocity bridge enabled on channel " + config.getChannel() + ".");
+        logDebug("Velocity bridge config: serverId=" + config.getServerId()
+                + ", heartbeatSeconds=" + config.getHeartbeatSeconds()
+                + ", maxPlayersOverride=" + config.getMaxPlayersOverride()
+                + ", authTokenPresent=" + (!config.getAuthToken().isBlank()));
     }
 
     public void shutdown() {
         if (!config.isEnabled()) {
+            logDebug("Velocity bridge shutdown skipped (disabled).");
             return;
         }
         if (heartbeatTask != null) {
@@ -60,12 +67,15 @@ public class VelocityPlayerCountBridge {
             listener = null;
         }
         plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, config.getChannel());
+        logDebug("Velocity bridge shutdown complete.");
     }
 
     public void requestImmediateUpdate() {
         if (!config.isEnabled()) {
+            logDebug("Immediate update requested but bridge disabled.");
             return;
         }
+        logDebug("Immediate update requested; scheduling send on main thread.");
         Bukkit.getScheduler().runTask(plugin, this::sendUpdate);
     }
 
@@ -75,19 +85,23 @@ public class VelocityPlayerCountBridge {
             heartbeatTask.cancel();
         }
         heartbeatTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendUpdate, intervalTicks, intervalTicks);
+        logDebug("Heartbeat scheduled every " + config.getHeartbeatSeconds() + "s (" + intervalTicks + " ticks).");
     }
 
     private void sendUpdate() {
         if (!config.isEnabled()) {
+            logDebug("Skipping sendUpdate because bridge disabled.");
             return;
         }
         Player player = getAnyPlayer();
         if (player == null) {
+            logDebug("Skipping sendUpdate because no online players are available for plugin messaging.");
             return;
         }
         int humans = manager.getOnlineHumansCount();
         int ai = manager.getOnlineAICount();
         int total = humans + ai;
+        logDebug("Preparing payload: humans=" + humans + ", ai=" + ai + ", total=" + total);
         CountPayload payload = new CountPayload(
                 config.getServerId(),
                 System.currentTimeMillis(),
@@ -98,8 +112,10 @@ public class VelocityPlayerCountBridge {
                 config.getAuthToken()
         );
         String json = gson.toJson(payload);
+        logDebug("Serialized Velocity payload (" + json.length() + " bytes) for channel " + config.getChannel() + ".");
         try {
             player.sendPluginMessage(plugin, config.getChannel(), json.getBytes(StandardCharsets.UTF_8));
+            logDebug("Velocity payload sent via player " + player.getName() + ".");
         } catch (Exception ex) {
             logFailure("Failed to send Velocity bridge update: " + ex.getMessage());
         }
@@ -130,6 +146,15 @@ public class VelocityPlayerCountBridge {
         AIPlayersFileLogger fileLogger = plugin.getFileLogger();
         if (fileLogger != null) {
             fileLogger.info(message);
+        }
+    }
+
+    void logDebug(String message) {
+        String decorated = "[VelocityBridge][debug] " + message;
+        plugin.getLogger().info(decorated);
+        AIPlayersFileLogger fileLogger = plugin.getFileLogger();
+        if (fileLogger != null) {
+            fileLogger.info(decorated);
         }
     }
 

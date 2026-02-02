@@ -15,11 +15,13 @@ public class VelocityBridgePlayerListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        bridge.logDebug("Player join detected (" + event.getPlayer().getName() + "), triggering immediate update.");
         bridge.requestImmediateUpdate();
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+        bridge.logDebug("Player quit detected (" + event.getPlayer().getName() + "), triggering immediate update.");
         bridge.requestImmediateUpdate();
     }
 }
