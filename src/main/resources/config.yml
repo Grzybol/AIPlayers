@@ -58,7 +58,8 @@ economy:
 velocity:
   bridge:
     enabled: true
-    channel: "aiplayers:count"
+    socket-path: "/tmp/velocity-player-count-bridge.sock"
+    protocol: "aiplayers-count-v1"
     heartbeat-seconds: 10
     server-id: ""
     max-players-override: 0

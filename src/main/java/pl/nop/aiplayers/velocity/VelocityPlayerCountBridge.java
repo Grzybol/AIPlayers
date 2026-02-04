@@ -3,29 +3,28 @@ package pl.nop.aiplayers.velocity;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
-import org.bukkit.event.HandlerList;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitTask;
 import pl.nop.aiplayers.AIPlayersPlugin;
 import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 
+import java.io.IOException;
+import java.net.StandardProtocolFamily;
+import java.net.UnixDomainSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class VelocityPlayerCountBridge {
 
-    private static final String PROTOCOL = "aiplayers-count-v1";
     private final AIPlayersPlugin plugin;
     private final AIPlayerManager manager;
     private final VelocityBridgeConfig config;
     private final Gson gson;
     private final AtomicLong lastErrorLogAt;
-    private byte[] pendingPayload;
     private BukkitTask heartbeatTask;
-    private VelocityBridgePlayerListener listener;
 
     public VelocityPlayerCountBridge(AIPlayersPlugin plugin, AIPlayerManager manager, VelocityBridgeConfig config) {
         this.plugin = plugin;
@@ -40,15 +39,12 @@ public class VelocityPlayerCountBridge {
             logDebug("Velocity bridge start skipped (disabled).");
             return;
         }
-        PluginManager pluginManager = plugin.getServer().getPluginManager();
-        plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, config.getChannel());
-        listener = new VelocityBridgePlayerListener(this);
-        pluginManager.registerEvents(listener, plugin);
-        logDebug("Registered outgoing plugin channel " + config.getChannel() + " and player listener.");
         scheduleHeartbeat();
         requestImmediateUpdate();
-        logInfo("Velocity bridge enabled on channel " + config.getChannel() + ".");
+        logInfo("Velocity bridge enabled on unix socket " + config.getSocketPath() + ".");
         logDebug("Velocity bridge config: serverId=" + config.getServerId()
+                + ", protocol=" + config.getProtocol()
+                + ", socketPath=" + config.getSocketPath()
                 + ", heartbeatSeconds=" + config.getHeartbeatSeconds()
                 + ", maxPlayersOverride=" + config.getMaxPlayersOverride()
                 + ", authTokenPresent=" + (!config.getAuthToken().isBlank()));
@@ -63,11 +59,6 @@ public class VelocityPlayerCountBridge {
             heartbeatTask.cancel();
             heartbeatTask = null;
         }
-        if (listener != null) {
-            HandlerList.unregisterAll(listener);
-            listener = null;
-        }
-        plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, config.getChannel());
         logDebug("Velocity bridge shutdown complete.");
     }
 
@@ -99,6 +90,7 @@ public class VelocityPlayerCountBridge {
         int total = humans + ai;
         logDebug("Preparing payload: humans=" + humans + ", ai=" + ai + ", total=" + total);
         CountPayload payload = new CountPayload(
+                config.getProtocol(),
                 config.getServerId(),
                 System.currentTimeMillis(),
                 humans,
@@ -108,56 +100,25 @@ public class VelocityPlayerCountBridge {
                 config.getAuthToken()
         );
         String json = gson.toJson(payload);
-        logDebug("Serialized Velocity payload (" + json.length() + " bytes) for channel " + config.getChannel() + ".");
-        byte[] message = json.getBytes(StandardCharsets.UTF_8);
+        logDebug("Serialized Velocity payload (" + json.length() + " bytes) for unix socket " + config.getSocketPath() + ".");
         try {
-            sendPayload(message);
+            sendPayload(json);
         } catch (Exception ex) {
             logFailure("Failed to send Velocity bridge update: " + ex.getMessage());
         }
     }
 
-    void flushPendingPayload(Player player) {
-        if (pendingPayload == null || player == null) {
-            return;
-        }
-        try {
-            player.sendPluginMessage(plugin, config.getChannel(), pendingPayload);
-            logDebug("Flushed pending Velocity payload via player " + player.getName() + ".");
-            pendingPayload = null;
-        } catch (Exception ex) {
-            logFailure("Failed to flush pending Velocity payload: " + ex.getMessage());
-        }
-    }
-
-    private void sendPayload(byte[] message) {
-        Player player = getPlayerForMessaging();
-        if (player != null) {
-            player.sendPluginMessage(plugin, config.getChannel(), message);
-            logDebug("Velocity payload sent via player " + player.getName() + ".");
-            pendingPayload = null;
-            return;
-        }
-        plugin.getServer().sendPluginMessage(plugin, config.getChannel(), message);
-        pendingPayload = message;
-        logDebug("Velocity payload sent via server (no players online). Cached payload for next join.");
-    }
-
-    private Player getPlayerForMessaging() {
-        Collection<? extends Player> players = Bukkit.getOnlinePlayers();
-        if (players.isEmpty()) {
-            return null;
-        }
-        Player fallback = null;
-        for (Player player : players) {
-            if (fallback == null) {
-                fallback = player;
+    private void sendPayload(String json) throws IOException {
+        Path socketPath = Path.of(config.getSocketPath());
+        UnixDomainSocketAddress address = UnixDomainSocketAddress.of(socketPath);
+        try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
+            channel.connect(address);
+            ByteBuffer buffer = ByteBuffer.wrap((json + "\n").getBytes(StandardCharsets.UTF_8));
+            while (buffer.hasRemaining()) {
+                channel.write(buffer);
             }
-            if (manager.getSession(player.getName()) == null) {
-                return player;
-            }
+            logDebug("Velocity payload sent via unix socket " + config.getSocketPath() + ".");
         }
-        return fallback;
     }
 
     private void logFailure(String message) {
@@ -190,7 +151,7 @@ public class VelocityPlayerCountBridge {
     }
 
     private static class CountPayload {
-        private final String protocol = PROTOCOL;
+        private final String protocol;
         @SerializedName("server_id")
         private final String serverId;
         @SerializedName("timestamp_ms")
@@ -206,8 +167,9 @@ public class VelocityPlayerCountBridge {
         @SerializedName("auth")
         private final String auth;
 
-        private CountPayload(String serverId, long timestampMs, int onlineHumans, int onlineAi, int onlineTotal,
+        private CountPayload(String protocol, String serverId, long timestampMs, int onlineHumans, int onlineAi, int onlineTotal,
                              int maxPlayersOverride, String auth) {
+            this.protocol = protocol;
             this.serverId = serverId;
             this.timestampMs = timestampMs;
             this.onlineHumans = onlineHumans;
