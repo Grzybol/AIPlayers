@@ -28,6 +28,7 @@ public class AIPlayerManager {
     private final Map<String, AIPlayerProfile> profiles = new HashMap<>();
     private final Map<String, AIPlayerSession> sessions = new HashMap<>();
     private final AIEconomyService economyService;
+    private int loadedBotCount;
     private AIControllerType defaultControllerType;
     private AIBehaviorMode defaultBehaviorMode;
 
@@ -56,6 +57,7 @@ public class AIPlayerManager {
         AIPlayerProfile profile = new AIPlayerProfile(uuid, name, defaultControllerType, defaultBehaviorMode,
                 location.clone(), location.clone(), roamRadius, chatInstruction);
         profiles.put(name, profile);
+        loadedBotCount++;
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Created AI player profile for " + name);
         logToFile("Created AI player profile for " + name + " (uuid=" + uuid + ")");
@@ -67,6 +69,7 @@ public class AIPlayerManager {
             return;
         }
         profiles.put(profile.getName(), profile);
+        loadedBotCount++;
         economyService.createIfPossible(profile);
         plugin.getLogger().info("Loaded AI player profile for " + profile.getName());
         logToFile("Loaded AI player profile for " + profile.getName() + " (uuid=" + profile.getUuid() + ")");
@@ -137,6 +140,7 @@ public class AIPlayerManager {
         sessions.put(name, session);
         plugin.getLogger().info("Spawned AI player " + name + " at " + locationToString(spawnLocation));
         logToFile("Spawned AI player " + name + " at " + locationToString(spawnLocation));
+        notifyVelocityBridge();
         return session;
     }
 
@@ -146,12 +150,15 @@ public class AIPlayerManager {
             session.getNpcHandle().despawn();
             plugin.getLogger().info("Despawned AI player " + name);
             logToFile("Despawned AI player " + name);
+            notifyVelocityBridge();
         }
     }
 
     public synchronized void removeAIPlayer(String name) {
         despawnAIPlayer(name);
-        profiles.remove(name);
+        if (profiles.remove(name) != null) {
+            loadedBotCount = Math.max(0, loadedBotCount - 1);
+        }
         logToFile("Removed AI player profile " + name);
     }
 
@@ -171,8 +178,28 @@ public class AIPlayerManager {
         return sessions.size();
     }
 
+    public synchronized int getOnlineHumansCount() {
+        return Bukkit.getOnlinePlayers().size();
+    }
+
+    public synchronized int getOnlineAICount() {
+        return sessions.size();
+    }
+
+    public synchronized int getLoadedBotCount() {
+        return loadedBotCount;
+    }
+
+    public synchronized int getOnlineTotalCount() {
+        return Bukkit.getOnlinePlayers().size() + sessions.size();
+    }
+
     public synchronized int getTotalOnlineCount() {
         return Bukkit.getOnlinePlayers().size() + sessions.size();
+    }
+
+    public synchronized int getReportedPlayerCount() {
+        return getOnlineHumansCount() + getLoadedBotCount();
     }
 
     public synchronized Collection<AIPlayerProfile> getAllProfiles() {
@@ -201,6 +228,12 @@ public class AIPlayerManager {
         AIPlayersFileLogger fileLogger = getFileLogger();
         if (fileLogger != null) {
             fileLogger.info(message);
+        }
+    }
+
+    private void notifyVelocityBridge() {
+        if (plugin instanceof AIPlayersPlugin) {
+            ((AIPlayersPlugin) plugin).requestVelocityBridgeUpdate();
         }
     }
 

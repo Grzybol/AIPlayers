@@ -55,3 +55,12 @@ chat:
     chat-history-limit: 10
 economy:
   enabled: true
+velocity:
+  bridge:
+    enabled: true
+    socket-path: "/tmp/velocity-player-count-bridge.sock"
+    protocol: "aiplayers-count-v1"
+    heartbeat-seconds: 10
+    server-id: ""
+    max-players-override: 0
+    auth-token: ""
