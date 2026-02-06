@@ -38,6 +38,14 @@ chat:
   history-size: 20
   memory-size: 20
   rate-limit-millis: 3000
+  discord:
+    enabled: false
+    webhook-url: ""
+    username: "%bot%"
+    avatar-url: ""
+    message-format: "<%bot%> %message%"
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
   engagement:
     engage-players-on-chat: false
     min-empty-chat-time-to-engage-in-seconds: 120
