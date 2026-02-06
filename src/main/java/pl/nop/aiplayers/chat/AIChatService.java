@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.plugin.Plugin;
 import pl.nop.aiplayers.AIPlayersPlugin;
+import pl.nop.aiplayers.chat.discord.DiscordRelayConfig;
+import pl.nop.aiplayers.chat.discord.DiscordWebhookRelay;
 import pl.nop.aiplayers.logging.AIPlayersFileLogger;
 import pl.nop.aiplayers.model.AIPlayerSession;
 
@@ -19,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AIChatService {
 
     private final Plugin plugin;
+    private final DiscordWebhookRelay discordRelay;
     private final Deque<ChatEntry> chatHistory;
     private int maxSize;
     private long rateLimitMillis;
@@ -28,11 +31,12 @@ public class AIChatService {
     private volatile long lastPlayerChatUpdateMillis;
     private volatile long lastPlayerChatSequence;
 
-    public AIChatService(Plugin plugin, int maxSize, long rateLimitMillis) {
+    public AIChatService(Plugin plugin, int maxSize, long rateLimitMillis, DiscordRelayConfig discordConfig) {
         this.plugin = plugin;
         this.chatHistory = new ArrayDeque<>();
         this.maxSize = Math.max(1, maxSize);
         this.rateLimitMillis = Math.max(0, rateLimitMillis);
+        this.discordRelay = new DiscordWebhookRelay(plugin, discordConfig, getFileLogger());
     }
 
     public synchronized void recordMessage(String sender, String message, ChatSenderType senderType) {
@@ -78,6 +82,10 @@ public class AIChatService {
         }
     }
 
+    public void updateDiscordConfig(DiscordRelayConfig config) {
+        discordRelay.updateConfig(config);
+    }
+
     public void sendChatMessage(AIPlayerSession session, String message) {
         if (!Bukkit.isPrimaryThread()) {
             Bukkit.getScheduler().runTask(plugin, () -> sendChatMessage(session, message));
@@ -96,6 +104,7 @@ public class AIChatService {
         String formatted = ChatColor.GRAY + "<" + session.getProfile().getName() + "> " + ChatColor.WHITE + sanitized;
         Bukkit.broadcastMessage(formatted);
         recordMessage(session.getProfile().getName(), sanitized, ChatSenderType.BOT);
+        discordRelay.sendBotMessage(session.getProfile().getName(), sanitized);
         logToFile("AIPlayer " + session.getProfile().getName() + " sent chat message: " + sanitized);
     }
 
