@@ -14,7 +14,7 @@ public class ChatEngagementConfig {
     private final int minBot2BotEmptyChatSeconds;
     private final int maxBot2BotEmptyChatSeconds;
     private final String baseUrl;
-    private final String planPath;
+    private final String engagementPath;
     private final Duration connectTimeout;
     private final Duration requestTimeout;
     private final int chatHistoryLimit;
@@ -46,7 +46,11 @@ public class ChatEngagementConfig {
         this.minBot2BotEmptyChatSeconds = minBotSeconds;
         this.maxBot2BotEmptyChatSeconds = maxBotSeconds;
         this.baseUrl = config.getString("chat.engagement.base-url", "");
-        this.planPath = config.getString("chat.engagement.plan-path", "/v1/plan");
+        String configuredEngagementPath = config.getString("chat.engagement.engagement-path");
+        if (configuredEngagementPath == null || configuredEngagementPath.isBlank()) {
+            configuredEngagementPath = config.getString("chat.engagement.plan-path", "/v1/plan");
+        }
+        this.engagementPath = configuredEngagementPath;
         this.connectTimeout = Duration.ofMillis(config.getLong("chat.engagement.connect-timeout-millis", 2000L));
         this.requestTimeout = Duration.ofMillis(config.getLong("chat.engagement.request-timeout-millis", 5000L));
         this.chatHistoryLimit = Math.max(1, config.getInt("chat.engagement.chat-history-limit", 10));
@@ -97,8 +101,8 @@ public class ChatEngagementConfig {
         return baseUrl;
     }
 
-    public String getPlanPath() {
-        return planPath;
+    public String getEngagementPath() {
+        return engagementPath;
     }
 
     public Duration getConnectTimeout() {
