@@ -232,7 +232,7 @@ public class ChatEngagementService {
 
     private void sendRequest(AIPlayerSession botSession, EngagementRequest request, long nowMillis) {
         String payload = gson.toJson(request);
-        String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        String targetUrl = config.getBaseUrl() + config.getEngagementPath();
         long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
@@ -506,7 +506,7 @@ public class ChatEngagementService {
 
     private void sendBot2BotRequest(AIPlayerSession botSession, Bot2BotRequest request, long nowMillis) {
         String payload = gson.toJson(request);
-        String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        String targetUrl = config.getBaseUrl() + config.getEngagementPath();
         long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
