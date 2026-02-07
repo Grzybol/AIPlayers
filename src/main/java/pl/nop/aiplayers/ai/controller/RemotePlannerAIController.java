@@ -114,6 +114,7 @@ public class RemotePlannerAIController implements AIController {
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
                     logToFile(message);
+                    logToFile("Planner request " + request.requestId + " payload (failure): " + payload);
                     return Action.idle();
                 });
     }
