@@ -16,6 +16,7 @@ import java.util.Map;
 
 public class DiscordWebhookRelay {
     private static final int DISCORD_MAX_MESSAGE_LENGTH = 2000;
+    private static final String DISCORD_API_BASE = "https://discord.com/api/v10";
 
     private final Plugin plugin;
     private final Gson gson;
@@ -41,14 +42,21 @@ public class DiscordWebhookRelay {
         if (!config.isEnabled()) {
             return;
         }
-        String webhookUrl = config.getWebhookUrl();
-        if (webhookUrl == null || webhookUrl.isBlank()) {
+        String guildId = config.getGuildId();
+        String channelId = config.getChannelId();
+        String botToken = config.getBotToken();
+        if (guildId == null || guildId.isBlank()) {
+            return;
+        }
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
+        if (botToken == null || botToken.isBlank()) {
             return;
         }
         if (message == null || message.isBlank()) {
             return;
         }
-        String username = resolveUsername(botName);
         String content = formatContent(botName, message);
         if (content.isBlank()) {
             return;
@@ -56,35 +64,28 @@ public class DiscordWebhookRelay {
         if (content.length() > DISCORD_MAX_MESSAGE_LENGTH) {
             content = content.substring(0, DISCORD_MAX_MESSAGE_LENGTH - 3) + "...";
         }
-        String avatarUrl = config.getAvatarUrl();
-        DiscordPayload payload = new DiscordPayload(content, username, avatarUrl);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> postWebhook(payload));
+        DiscordPayload payload = new DiscordPayload(content);
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> postMessage(payload));
     }
 
-    private void postWebhook(DiscordPayload payload) {
+    private void postMessage(DiscordPayload payload) {
         String body = gson.toJson(payload);
+        String channelId = config.getChannelId();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(config.getWebhookUrl()))
+                .uri(URI.create(DISCORD_API_BASE + "/channels/" + channelId + "/messages"))
                 .timeout(config.getRequestTimeout())
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bot " + config.getBotToken())
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                 .build();
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log("Discord webhook returned status " + response.statusCode() + ": " + response.body());
+                log("Discord API returned status " + response.statusCode() + ": " + response.body());
             }
         } catch (Exception ex) {
-            log("Discord webhook failed: " + ex.getMessage());
+            log("Discord API request failed: " + ex.getMessage());
         }
-    }
-
-    private String resolveUsername(String botName) {
-        String configured = config.getUsername();
-        if (configured == null || configured.isBlank()) {
-            return botName;
-        }
-        return configured.replace("%bot%", botName == null ? "AIPlayer" : botName);
     }
 
     private String formatContent(String botName, String message) {
@@ -106,14 +107,10 @@ public class DiscordWebhookRelay {
 
     private static class DiscordPayload {
         private final String content;
-        private final String username;
-        private final String avatar_url;
         private final Map<String, Object> allowed_mentions;
 
-        private DiscordPayload(String content, String username, String avatarUrl) {
+        private DiscordPayload(String content) {
             this.content = content;
-            this.username = username;
-            this.avatar_url = avatarUrl == null || avatarUrl.isBlank() ? null : avatarUrl;
             this.allowed_mentions = new HashMap<>();
             this.allowed_mentions.put("parse", new String[0]);
         }

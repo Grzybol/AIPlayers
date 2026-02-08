@@ -6,18 +6,18 @@ import java.time.Duration;
 
 public class DiscordRelayConfig {
     private final boolean enabled;
-    private final String webhookUrl;
-    private final String username;
-    private final String avatarUrl;
+    private final String guildId;
+    private final String channelId;
+    private final String botToken;
     private final String messageFormat;
     private final Duration connectTimeout;
     private final Duration requestTimeout;
 
     public DiscordRelayConfig(Configuration config) {
         this.enabled = config.getBoolean("chat.discord.enabled", false);
-        this.webhookUrl = config.getString("chat.discord.webhook-url", "");
-        this.username = config.getString("chat.discord.username", "");
-        this.avatarUrl = config.getString("chat.discord.avatar-url", "");
+        this.guildId = config.getString("chat.discord.guild-id", "");
+        this.channelId = config.getString("chat.discord.channel-id", "");
+        this.botToken = config.getString("chat.discord.bot-token", "");
         this.messageFormat = config.getString("chat.discord.message-format", "<%bot%> %message%");
         long connectMillis = config.getLong("chat.discord.connect-timeout-millis", 2000L);
         long requestMillis = config.getLong("chat.discord.request-timeout-millis", 5000L);
@@ -29,16 +29,16 @@ public class DiscordRelayConfig {
         return enabled;
     }
 
-    public String getWebhookUrl() {
-        return webhookUrl;
+    public String getGuildId() {
+        return guildId;
     }
 
-    public String getUsername() {
-        return username;
+    public String getChannelId() {
+        return channelId;
     }
 
-    public String getAvatarUrl() {
-        return avatarUrl;
+    public String getBotToken() {
+        return botToken;
     }
 
     public String getMessageFormat() {
