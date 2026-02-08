@@ -12,6 +12,7 @@ import pl.nop.aiplayers.ai.controller.RemotePlannerConfig;
 import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.chat.AIChatListener;
 import pl.nop.aiplayers.chat.AIChatService;
+import pl.nop.aiplayers.chat.discord.DiscordRelayConfig;
 import pl.nop.aiplayers.chat.engagement.ChatEngagementConfig;
 import pl.nop.aiplayers.chat.engagement.ChatEngagementService;
 import pl.nop.aiplayers.command.AIPlayersCommand;
@@ -50,7 +51,8 @@ public class AIPlayersPlugin extends JavaPlugin {
 
         this.chatService = new AIChatService(this,
                 config.getInt("chat.history-size", 20),
-                config.getLong("chat.rate-limit-millis", 3000L));
+                config.getLong("chat.rate-limit-millis", 3000L),
+                new DiscordRelayConfig(config));
         this.economyService = new AIEconomyService(this, config.getBoolean("economy.enabled", true));
         this.storage = new AIPlayerStorage(getDataFolder());
 
@@ -169,6 +171,7 @@ public class AIPlayersPlugin extends JavaPlugin {
         chatService.updateSettings(
                 config.getInt("chat.history-size", 20),
                 config.getLong("chat.rate-limit-millis", 3000L));
+        chatService.updateDiscordConfig(new DiscordRelayConfig(config));
         actionExecutor.updateSettings(
                 config.getInt("ai.action-queue-size", 5),
                 config.getLong("ai.action-timeout-millis", 4000L),

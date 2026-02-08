@@ -132,7 +132,7 @@ curl -X POST "http://localhost:8080/v1/plan" \
 
 ### Gdzie jest wywoływane
 - Konfiguracja: `chat.engagement.*` w `config.yml`.
-- Endpoint: `base-url + plan-path` (domyślnie `/v1/plan`).
+- Endpoint: `base-url + engagement-path` (domyślnie `/v1/engagement`).
 - Wywołanie tylko wtedy, gdy `chat.engagement.engage-players-on-chat` jest włączone i minął czas „ciszy” na czacie.
 
 ### Ile wiadomości z czatu jest wysyłanych
@@ -195,6 +195,32 @@ Do requestu trafia **ostatnie N wiadomości czatu**, gdzie `N` = `chat.engagemen
 - `target_player`: wybrany losowo gracz (nie-bot), do którego bot spróbuje się odezwać.
 - `example_prompt`: krótkie pole z promptem pomocniczym do rozpoczęcia rozmowy.
 
+### Oczekiwana odpowiedź
+Odpowiedź jest kompatybilna z plannerem (`PlannerResponse`) i zawiera listę akcji, z których
+plugin wybiera wiadomość dla konkretnego bota.
+
+```json
+{
+  "request_id": "uuid",
+  "actions": [
+    {
+      "bot_id": "uuid",
+      "send_after_ms": 0,
+      "message": "string",
+      "visibility": "PUBLIC"
+    }
+  ]
+}
+```
+
+#### Opis pól odpowiedzi
+- `request_id`: identyfikator requestu, pozwala sparować odpowiedź z żądaniem.
+- `actions`: lista akcji dla botów.
+  - `bot_id`: UUID bota, którego dotyczy akcja.
+  - `send_after_ms`: opóźnienie wysyłki (ms); obecnie ignorowane.
+  - `message`: treść wiadomości wysyłanej na czat.
+  - `visibility`: opcjonalna flaga widoczności (np. `PUBLIC`).
+
 ### Przykładowe wywołanie (cURL)
 ```bash
 curl -X POST "http://localhost:8080/v1/plan" \
@@ -242,9 +268,24 @@ curl -X POST "http://localhost:8080/v1/plan" \
   }'
 ```
 
+### Przykładowa odpowiedź
+```json
+{
+  "request_id": "c2a0c349-1f34-4b71-8248-5b8a2f8bbf2c",
+  "actions": [
+    {
+      "bot_id": "6cdb6376-3ba2-421a-8a42-98fc6f8a70f3",
+      "send_after_ms": 0,
+      "message": "Siema PlayerX! Co dziś budujesz?",
+      "visibility": "PUBLIC"
+    }
+  ]
+}
+```
+
 ### Bot2bot engagement
 - Konfiguracja: `chat.engagement.bot2bot.*` w `config.yml`.
-- Endpoint: `base-url + plan-path` (domyślnie `/v1/plan`).
+- Endpoint: `base-url + engagement-path` (domyślnie `/v1/engagement`).
 - Wywołanie tylko wtedy, gdy `chat.engagement.bot2bot.enabled` jest włączone, minął czas ciszy
   w zakresie `min/max-empty-chat-time-to-engage-in-seconds` i jest dostępnych przynajmniej 2 boty online.
 - `settings.global_silence_chance` jest zwiększane o `bot2bot.silence-multiplier` przy każdej kolejnej próbie,

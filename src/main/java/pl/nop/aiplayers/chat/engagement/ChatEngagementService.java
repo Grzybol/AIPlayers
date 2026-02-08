@@ -232,7 +232,7 @@ public class ChatEngagementService {
 
     private void sendRequest(AIPlayerSession botSession, EngagementRequest request, long nowMillis) {
         String payload = gson.toJson(request);
-        String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        String targetUrl = config.getBaseUrl() + config.getEngagementPath();
         long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
@@ -268,6 +268,7 @@ public class ChatEngagementService {
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
                     logToFile(message);
+                    logToFile("Engagement request " + request.requestId + " payload (failure): " + payload);
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNext(nowMillis));
@@ -505,7 +506,7 @@ public class ChatEngagementService {
 
     private void sendBot2BotRequest(AIPlayerSession botSession, Bot2BotRequest request, long nowMillis) {
         String payload = gson.toJson(request);
-        String targetUrl = config.getBaseUrl() + config.getPlanPath();
+        String targetUrl = config.getBaseUrl() + config.getEngagementPath();
         long startMillis = System.currentTimeMillis();
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
@@ -542,6 +543,7 @@ public class ChatEngagementService {
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
                     logToFile(message);
+                    logToFile("Bot2bot engagement request " + request.requestId + " payload (failure): " + payload);
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNextBot2Bot(nowMillis));

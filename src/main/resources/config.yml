@@ -38,6 +38,14 @@ chat:
   history-size: 20
   memory-size: 20
   rate-limit-millis: 3000
+  discord:
+    enabled: false
+    guild-id: ""
+    channel-id: ""
+    bot-token: ""
+    message-format: "<%bot%> %message%"
+    connect-timeout-millis: 2000
+    request-timeout-millis: 5000
   engagement:
     engage-players-on-chat: false
     min-empty-chat-time-to-engage-in-seconds: 120
@@ -49,7 +57,7 @@ chat:
       base-silence-chance: 0.3
       silence-multiplier: 0.5
     base-url: "http://localhost:8080"
-    plan-path: "/v1/plan"
+    engagement-path: "/v1/engagement"
     connect-timeout-millis: 2000
     request-timeout-millis: 5000
     chat-history-limit: 10
