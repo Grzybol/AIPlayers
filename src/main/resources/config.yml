@@ -3,6 +3,15 @@ ai:
   action-queue-size: 5
   action-timeout-millis: 4000
   action-cooldown-millis: 500
+  roam:
+    min-delay-ms: 700
+    max-delay-ms: 3500
+    idle-chance: 0.3
+    idle-min-ms: 400
+    idle-max-ms: 2500
+    step-min: 0.35
+    step-max: 0.80
+    reach-threshold: 0.6
   default:
     behavior-mode: WANDER
     controller-type: DUMMY
