@@ -10,6 +10,8 @@ import pl.nop.aiplayers.ai.controller.DummyAIController;
 import pl.nop.aiplayers.ai.controller.RemotePlannerAIController;
 import pl.nop.aiplayers.ai.controller.RemotePlannerConfig;
 import pl.nop.aiplayers.ai.ActionExecutor;
+import pl.nop.aiplayers.ai.movement.RoamingConfig;
+import pl.nop.aiplayers.ai.movement.RoamingService;
 import pl.nop.aiplayers.chat.AIChatListener;
 import pl.nop.aiplayers.chat.AIChatService;
 import pl.nop.aiplayers.chat.discord.DiscordRelayConfig;
@@ -38,6 +40,7 @@ public class AIPlayersPlugin extends JavaPlugin {
     private AIEconomyService economyService;
     private AIPlayerStorage storage;
     private ActionExecutor actionExecutor;
+    private RoamingService roamingService;
     private AIPlayersFileLogger fileLogger;
     private ChatEngagementService engagementService;
     private BukkitTask tickTask;
@@ -73,9 +76,10 @@ public class AIPlayersPlugin extends JavaPlugin {
                 config.getInt("ai.action-queue-size", 5),
                 config.getLong("ai.action-timeout-millis", 4000L),
                 config.getLong("ai.action-cooldown-millis", 500L));
+        this.roamingService = new RoamingService(new RoamingConfig(config));
         this.engagementService = new ChatEngagementService(this, chatService, aiPlayerManager, new ChatEngagementConfig(config));
 
-        DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20));
+        DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20), roamingService);
         this.controllerRegistry = new AIControllerRegistry();
         this.controllerRegistry.registerDefaults(dummyController);
         registerRemoteController(remoteConfig);
@@ -116,7 +120,8 @@ public class AIPlayersPlugin extends JavaPlugin {
 
     private void startTickTask() {
         int interval = getConfig().getInt("ai.tick-interval-ticks", 10);
-        tickTask = new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor, engagementService)
+        tickTask = new AITickTask(this, aiPlayerManager, controllerRegistry, economyService, chatService, actionExecutor, engagementService,
+                roamingService)
                 .runTaskTimer(this, interval, interval);
     }
 
@@ -176,11 +181,14 @@ public class AIPlayersPlugin extends JavaPlugin {
                 config.getInt("ai.action-queue-size", 5),
                 config.getLong("ai.action-timeout-millis", 4000L),
                 config.getLong("ai.action-cooldown-millis", 500L));
+        this.roamingService = new RoamingService(new RoamingConfig(config));
         if (engagementService != null) {
             engagementService.updateConfig(new ChatEngagementConfig(config));
         }
         RemotePlannerConfig remoteConfig = new RemotePlannerConfig(config);
         registerRemoteController(remoteConfig);
+        DummyAIController dummyController = new DummyAIController(config.getInt("chat.memory-size", 20), roamingService);
+        controllerRegistry.registerDefaults(dummyController);
         AIControllerType defaultController = parseControllerType(config.getString("ai.default.controller-type", "DUMMY"));
         AIBehaviorMode defaultBehavior = parseBehaviorMode(config.getString("ai.default.behavior-mode", "WANDER"));
         if (remoteConfig.isEnabled() && defaultController == AIControllerType.DUMMY

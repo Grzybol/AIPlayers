@@ -9,6 +9,7 @@ import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.ai.Perception;
 import pl.nop.aiplayers.ai.controller.AIController;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
+import pl.nop.aiplayers.ai.movement.RoamingService;
 import pl.nop.aiplayers.chat.AIChatService;
 import pl.nop.aiplayers.chat.engagement.ChatEngagementService;
 import pl.nop.aiplayers.economy.AIEconomyService;
@@ -19,7 +20,6 @@ import pl.nop.aiplayers.npc.NPCHandle;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 public class AITickTask extends BukkitRunnable {
@@ -31,12 +31,11 @@ public class AITickTask extends BukkitRunnable {
     private final AIChatService chatService;
     private final ActionExecutor actionExecutor;
     private final ChatEngagementService engagementService;
-    private final Random random = new Random();
-    private final double stepSize = 0.65;
+    private final RoamingService roamingService;
 
     public AITickTask(pl.nop.aiplayers.AIPlayersPlugin plugin, AIPlayerManager manager, AIControllerRegistry controllerRegistry,
                       AIEconomyService economyService, AIChatService chatService, ActionExecutor actionExecutor,
-                      ChatEngagementService engagementService) {
+                      ChatEngagementService engagementService, RoamingService roamingService) {
         this.plugin = plugin;
         this.manager = manager;
         this.controllerRegistry = controllerRegistry;
@@ -44,6 +43,7 @@ public class AITickTask extends BukkitRunnable {
         this.chatService = chatService;
         this.actionExecutor = actionExecutor;
         this.engagementService = engagementService;
+        this.roamingService = roamingService;
     }
 
     @Override
@@ -105,52 +105,7 @@ public class AITickTask extends BukkitRunnable {
     }
 
     private Action buildLocalMovementAction(AIPlayerSession session, Location current) {
-        Location nextStep = nextWanderStep(session, current);
-        if (nextStep != null) {
-            return Action.moveTo(nextStep);
-        }
-        return Action.idle();
-    }
-
-    private Location nextWanderStep(AIPlayerSession session, Location current) {
-        if (current == null) {
-            return null;
-        }
-        Location spawn = session.getProfile().getSpawnLocation();
-        if (spawn == null) {
-            spawn = current.clone();
-        }
-        double radius = Math.max(session.getProfile().getRoamRadius(), 1.0);
-        Location target = (Location) session.getRuntimeMemory().get("fallbackWanderTarget");
-        if (target == null || target.getWorld() == null || target.distanceSquared(spawn) > radius * radius) {
-            target = randomTarget(spawn, radius);
-            session.getRuntimeMemory().put("fallbackWanderTarget", target);
-        }
-        double distance = target.distance(current);
-        if (distance <= stepSize) {
-            session.getRuntimeMemory().remove("fallbackWanderTarget");
-            return target;
-        }
-        Location step = current.clone();
-        double dx = target.getX() - current.getX();
-        double dz = target.getZ() - current.getZ();
-        double scale = stepSize / Math.sqrt(dx * dx + dz * dz);
-        step.add(dx * scale, 0, dz * scale);
-        step.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
-        step.setPitch(0f);
-        if (step.distanceSquared(spawn) > radius * radius) {
-            session.getRuntimeMemory().remove("fallbackWanderTarget");
-            return randomTarget(spawn, radius);
-        }
-        return step;
-    }
-
-    private Location randomTarget(Location center, double radius) {
-        double angle = random.nextDouble() * Math.PI * 2;
-        double distance = Math.sqrt(random.nextDouble()) * radius;
-        double x = center.getX() + Math.cos(angle) * distance;
-        double z = center.getZ() + Math.sin(angle) * distance;
-        return new Location(center.getWorld(), x, center.getY(), z);
+        return roamingService.buildRoamAction(session, current);
     }
 
     private Perception buildPerception(AIPlayerSession session) {

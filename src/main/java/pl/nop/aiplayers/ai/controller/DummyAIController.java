@@ -3,6 +3,7 @@ package pl.nop.aiplayers.ai.controller;
 import org.bukkit.Location;
 import pl.nop.aiplayers.ai.Action;
 import pl.nop.aiplayers.ai.Perception;
+import pl.nop.aiplayers.ai.movement.RoamingService;
 import pl.nop.aiplayers.model.AIPlayerSession;
 
 import java.util.ArrayDeque;
@@ -17,15 +18,15 @@ public class DummyAIController implements AIController {
 
     private final Random random = new Random();
     private final int chatMemorySize;
-    private final double stepSize;
     private final double lookChance;
     private final double chatReplyChance;
+    private final RoamingService roamingService;
 
-    public DummyAIController(int chatMemorySize) {
+    public DummyAIController(int chatMemorySize, RoamingService roamingService) {
         this.chatMemorySize = Math.max(chatMemorySize, 1);
-        this.stepSize = 0.65;
         this.lookChance = 0.25;
         this.chatReplyChance = 0.35;
+        this.roamingService = roamingService;
     }
 
     @Override
@@ -48,11 +49,8 @@ public class DummyAIController implements AIController {
                 return Action.lookAt(lookTarget);
             }
         }
-        Location nextStep = nextWanderStep(session, perception.getLocation());
-        if (nextStep != null) {
-            return Action.moveTo(nextStep);
-        }
-        return Action.idle();
+        Action roamAction = roamingService.buildRoamAction(session, perception.getLocation());
+        return roamAction != null ? roamAction : Action.idle();
     }
 
     private ChatLine updateChatMemory(AIPlayerSession session, List<String> history, String selfName) {
@@ -182,39 +180,6 @@ public class DummyAIController implements AIController {
             styled += " Masz jeszcze jakieś pytanie?";
         }
         return styled;
-    }
-
-    private Location nextWanderStep(AIPlayerSession session, Location current) {
-        if (current == null) {
-            return null;
-        }
-        Location spawn = session.getProfile().getSpawnLocation();
-        if (spawn == null) {
-            spawn = current.clone();
-        }
-        double radius = Math.max(session.getProfile().getRoamRadius(), 1.0);
-        Location target = (Location) session.getRuntimeMemory().get("wanderTarget");
-        if (target == null || target.getWorld() == null || target.distanceSquared(spawn) > radius * radius) {
-            target = randomTarget(spawn, radius);
-            session.getRuntimeMemory().put("wanderTarget", target);
-        }
-        double distance = target.distance(current);
-        if (distance <= stepSize) {
-            session.getRuntimeMemory().remove("wanderTarget");
-            return target;
-        }
-        Location step = current.clone();
-        double dx = target.getX() - current.getX();
-        double dz = target.getZ() - current.getZ();
-        double scale = stepSize / Math.sqrt(dx * dx + dz * dz);
-        step.add(dx * scale, 0, dz * scale);
-        step.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
-        step.setPitch(0f);
-        if (step.distanceSquared(spawn) > radius * radius) {
-            session.getRuntimeMemory().remove("wanderTarget");
-            return randomTarget(spawn, radius);
-        }
-        return step;
     }
 
     private Location randomTarget(Location center, double radius) {
