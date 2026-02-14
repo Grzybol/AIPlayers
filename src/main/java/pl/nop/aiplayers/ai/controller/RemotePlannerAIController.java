@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -354,19 +355,68 @@ public class RemotePlannerAIController implements AIController {
                 responderSequence = sequence;
                 return;
             }
-            List<AIPlayerSession> shuffled = new ArrayList<>(sessions);
-            Collections.shuffle(shuffled, ThreadLocalRandom.current());
-            int max = Math.max(1, config.getMaxBotsPerPlayerMessage());
+            AIPlayerSession selectedResponder = selectResponderForMessage(sequence, sessions);
             Set<UUID> selected = new HashSet<>();
-            for (AIPlayerSession session : shuffled) {
-                selected.add(session.getProfile().getUuid());
-                if (selected.size() >= max) {
-                    break;
-                }
+            if (selectedResponder != null) {
+                selected.add(selectedResponder.getProfile().getUuid());
             }
             responders = Collections.unmodifiableSet(selected);
             responderSequence = sequence;
         }
+    }
+
+    private AIPlayerSession selectResponderForMessage(long sequence, List<AIPlayerSession> sessions) {
+        List<AIPlayerSession> mentionedBots = findMentionedBots(sequence, sessions);
+        if (!mentionedBots.isEmpty()) {
+            return pickRandomSession(mentionedBots);
+        }
+        return pickRandomSession(sessions);
+    }
+
+    private List<AIPlayerSession> findMentionedBots(long sequence, List<AIPlayerSession> sessions) {
+        AIChatService.ChatEntry playerMessage = findPlayerMessageBySequence(sequence);
+        if (playerMessage == null) {
+            return Collections.emptyList();
+        }
+        String normalizedMessage = normalize(playerMessage.getMessage());
+        if (normalizedMessage.isBlank()) {
+            return Collections.emptyList();
+        }
+        List<AIPlayerSession> mentioned = new ArrayList<>();
+        for (AIPlayerSession session : sessions) {
+            String normalizedBotName = normalize(session.getProfile().getName());
+            if (!normalizedBotName.isBlank() && normalizedMessage.contains(normalizedBotName)) {
+                mentioned.add(session);
+            }
+        }
+        return mentioned;
+    }
+
+    private AIChatService.ChatEntry findPlayerMessageBySequence(long sequence) {
+        List<AIChatService.ChatEntry> entries = chatService.getChatEntriesSnapshot();
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            AIChatService.ChatEntry entry = entries.get(i);
+            if (entry.getSequence() == sequence && entry.getSenderType() == AIChatService.ChatSenderType.PLAYER) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private AIPlayerSession pickRandomSession(List<AIPlayerSession> sessions) {
+        if (sessions == null || sessions.isEmpty()) {
+            return null;
+        }
+        int index = ThreadLocalRandom.current().nextInt(sessions.size());
+        return sessions.get(index);
+    }
+
+    private String normalize(String text) {
+        if (text == null) {
+            return "";
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        return lower.replaceAll("[^\\p{L}\\p{Nd}]", "");
     }
 
     private void logToFile(String message) {
