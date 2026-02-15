@@ -69,19 +69,24 @@ public class RemotePlannerAIController implements AIController {
         }
         PlannerRequest request = buildRequest(session, perception);
         if (request == null) {
-            logToFile("Planner request skipped: missing base URL for bot " + session.getProfile().getName());
+            logToFile("Planner request skipped: missing base URL for bot " + session.getProfile().getName(),
+                    plannerColumns(null, session, null, null, null, null, null));
             return CompletableFuture.completedFuture(Action.idle());
         }
         String payload = gson.toJson(request);
         String targetUrl = config.getBaseUrl() + config.getPlanPath();
         long startMillis = System.currentTimeMillis();
+        String transactionId = request.requestId;
         plugin.getLogger().info("Sending chat request to the server " + targetUrl + " for AIPlayer " + session.getProfile().getName());
         logToFile("Sending planner request " + request.requestId + " to " + targetUrl
-                + " for bot=" + session.getProfile().getName()
-                + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()));
-        logToFile("Planner request " + request.requestId + " payload: " + payload);
+                        + " for bot=" + session.getProfile().getName()
+                        + ", chatLines=" + (request.chat == null ? 0 : request.chat.size()),
+                plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
+        logToFile("Planner request " + request.requestId + " payload: " + payload,
+                plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
         logToFile("Planner request " + request.requestId + " timeouts: connect="
-                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
+                        + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms",
+                plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
                 .version(HttpClient.Version.HTTP_1_1)
@@ -90,7 +95,8 @@ public class RemotePlannerAIController implements AIController {
                 .header("Connection", "close")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
                 .build();
-        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json, Connection=close, HttpVersion=HTTP/1.1");
+        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json, Connection=close, HttpVersion=HTTP/1.1",
+                plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
@@ -98,27 +104,32 @@ public class RemotePlannerAIController implements AIController {
                     if (response.statusCode() < 200 || response.statusCode() >= 300) {
                         plugin.getLogger().warning("Planner API responded with status " + response.statusCode());
                         logToFile("Planner API responded with status " + response.statusCode()
-                                + " for request " + request.requestId
-                                + ", durationMs=" + durationMillis);
-                        logToFile("Planner response " + request.requestId + " payload: " + response.body());
+                                        + " for request " + request.requestId
+                                        + ", durationMs=" + durationMillis,
+                                plannerColumns(transactionId, session, targetUrl, payload, response.body(), response.statusCode(), durationMillis));
+                        logToFile("Planner response " + request.requestId + " payload: " + response.body(),
+                                plannerColumns(transactionId, session, targetUrl, payload, response.body(), response.statusCode(), durationMillis));
                         return null;
                     }
                     logToFile("Planner API responded with status " + response.statusCode()
-                            + " for request " + request.requestId
-                            + ", durationMs=" + durationMillis
-                            + ", payloadLength=" + response.body().length());
-                    logToFile("Planner response " + request.requestId + " payload: " + response.body());
+                                    + " for request " + request.requestId
+                                    + ", durationMs=" + durationMillis
+                                    + ", payloadLength=" + response.body().length(),
+                            plannerColumns(transactionId, session, targetUrl, payload, response.body(), response.statusCode(), durationMillis));
+                    logToFile("Planner response " + request.requestId + " payload: " + response.body(),
+                            plannerColumns(transactionId, session, targetUrl, payload, response.body(), response.statusCode(), durationMillis));
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
-                .thenCompose(response -> toActionFuture(session, response))
+                .thenCompose(response -> toActionFuture(session, response, transactionId))
                 .exceptionally(ex -> {
                     String details = describeException(ex);
                     long durationMillis = System.currentTimeMillis() - startMillis;
                     String message = "Planner API request failed after " + durationMillis + "ms to " + targetUrl
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
-                    logToFile(message);
-                    logToFile("Planner request " + request.requestId + " payload (failure): " + payload);
+                    logToFile(message, plannerColumns(transactionId, session, targetUrl, payload, null, null, durationMillis));
+                    logToFile("Planner request " + request.requestId + " payload (failure): " + payload,
+                            plannerColumns(transactionId, session, targetUrl, payload, null, null, durationMillis));
                     return Action.idle();
                 });
     }
@@ -139,7 +150,7 @@ public class RemotePlannerAIController implements AIController {
         return true;
     }
 
-    private CompletableFuture<Action> toActionFuture(AIPlayerSession session, PlannerResponse response) {
+    private CompletableFuture<Action> toActionFuture(AIPlayerSession session, PlannerResponse response, String transactionId) {
         if (response == null || response.actions == null || response.actions.isEmpty()) {
             return CompletableFuture.completedFuture(Action.idle());
         }
@@ -149,19 +160,22 @@ public class RemotePlannerAIController implements AIController {
                 .findFirst()
                 .orElse(null);
         if (planned == null || planned.message == null || planned.message.isBlank()) {
-            logToFile("Planner response contained no chat action for bot " + session.getProfile().getName());
+            logToFile("Planner response contained no chat action for bot " + session.getProfile().getName(),
+                    plannerColumns(transactionId, session, null, null, null, null, null));
             return CompletableFuture.completedFuture(Action.idle());
         }
         long delay = Math.max(0, planned.sendAfterMs);
         String cleanedMessage = stripBotPrefix(planned.message, session.getProfile().getName());
         cleanedMessage = pl.nop.aiplayers.chat.ChatMessageSanitizer.sanitizeOutgoing(cleanedMessage);
         if (cleanedMessage.isBlank()) {
-            logToFile("Planner response message was empty after cleanup for bot " + session.getProfile().getName());
+            logToFile("Planner response message was empty after cleanup for bot " + session.getProfile().getName(),
+                    plannerColumns(transactionId, session, null, null, null, null, null));
             return CompletableFuture.completedFuture(Action.idle());
         }
         Action action = Action.say(cleanedMessage);
         logToFile("Planner response action for bot " + session.getProfile().getName()
-                + ": message='" + cleanedMessage + "', sendAfterMs=" + planned.sendAfterMs);
+                        + ": message='" + cleanedMessage + "', sendAfterMs=" + planned.sendAfterMs,
+                plannerColumns(transactionId, session, null, null, cleanedMessage, null, null));
         if (delay <= 0) {
             return CompletableFuture.completedFuture(action);
         }
@@ -423,10 +437,49 @@ public class RemotePlannerAIController implements AIController {
     }
 
     private void logToFile(String message) {
+        logToFile(message, Collections.emptyMap());
+    }
+
+    private void logToFile(String message, java.util.Map<String, String> columns) {
         AIPlayersFileLogger fileLogger = getFileLogger();
         if (fileLogger != null) {
-            fileLogger.info(message);
+            fileLogger.info(message, columns);
         }
+    }
+
+    private java.util.Map<String, String> plannerColumns(String transactionId,
+                                                         AIPlayerSession session,
+                                                         String targetUrl,
+                                                         String requestPayload,
+                                                         String responsePayload,
+                                                         Integer httpResponseCode,
+                                                         Long durationMs) {
+        java.util.Map<String, String> columns = new java.util.LinkedHashMap<>();
+        if (transactionId != null && !transactionId.isBlank()) {
+            columns.put("transactionId", transactionId);
+        }
+        if (session != null) {
+            if (session.getProfile() != null) {
+                columns.put("botId", String.valueOf(session.getProfile().getUuid()));
+                columns.put("botName", String.valueOf(session.getProfile().getName()));
+            }
+        }
+        if (targetUrl != null) {
+            columns.put("targetUrl", targetUrl);
+        }
+        if (requestPayload != null) {
+            columns.put("request", requestPayload);
+        }
+        if (responsePayload != null) {
+            columns.put("response", responsePayload);
+        }
+        if (httpResponseCode != null) {
+            columns.put("httpResponseCode", String.valueOf(httpResponseCode));
+        }
+        if (durationMs != null) {
+            columns.put("durationMs", String.valueOf(durationMs));
+        }
+        return columns;
     }
 
     private AIPlayersFileLogger getFileLogger() {
