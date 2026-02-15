@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Map;
 
 public class AIPlayersFileLogger {
 
@@ -27,28 +29,56 @@ public class AIPlayersFileLogger {
     }
 
     public synchronized void info(String message) {
-        write("INFO", message);
+        write("INFO", message, Collections.emptyMap());
+    }
+
+    public synchronized void info(String message, Map<String, String> columns) {
+        write("INFO", message, columns);
     }
 
     public synchronized void warn(String message) {
-        write("WARN", message);
+        write("WARN", message, Collections.emptyMap());
+    }
+
+    public synchronized void warn(String message, Map<String, String> columns) {
+        write("WARN", message, columns);
     }
 
     public synchronized void error(String message) {
-        write("ERROR", message);
+        write("ERROR", message, Collections.emptyMap());
     }
 
-    private void write(String level, String message) {
+    public synchronized void error(String message, Map<String, String> columns) {
+        write("ERROR", message, columns);
+    }
+
+    private void write(String level, String message, Map<String, String> columns) {
         refreshLogFile();
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
-        String line = "[" + timestamp + "] [" + level + "] " + message + System.lineSeparator();
+        String line = "[" + timestamp + "] [" + level + "] " + message + formatColumns(columns) + System.lineSeparator();
         try {
             Files.createDirectories(logsDirectory);
             Files.writeString(currentLogFile, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             plugin.getLogger().warning("Failed to write to AIPlayers log file: " + e.getMessage());
         }
-        elasticBufferBridge.log(level, message);
+        elasticBufferBridge.log(level, message, columns);
+    }
+
+    private String formatColumns(Map<String, String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(" | columns=");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : columns.entrySet()) {
+            if (!first) {
+                builder.append(',');
+            }
+            builder.append(entry.getKey()).append('=').append(entry.getValue());
+            first = false;
+        }
+        return builder.toString();
     }
 
     private void refreshLogFile() {

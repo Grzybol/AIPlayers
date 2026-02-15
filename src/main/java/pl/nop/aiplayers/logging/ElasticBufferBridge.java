@@ -7,6 +7,7 @@ import pl.nop.aiplayers.AIPlayersPlugin;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
@@ -30,19 +31,20 @@ final class ElasticBufferBridge {
         return bridge;
     }
 
-    void log(String level, String message) {
+    void log(String level, String message, Map<String, String> columns) {
         if (!enabled) {
             return;
         }
         try {
             String pluginName = plugin.getDescription().getName();
             int paramCount = logMethod.getParameterCount();
+            Map<String, String> safeColumns = columns == null ? Collections.emptyMap() : columns;
             if (paramCount == 4) {
                 logMethod.invoke(api, message, level, pluginName, null);
             } else if (paramCount == 6) {
                 logMethod.invoke(api, message, level, pluginName, null, null, null);
             } else if (paramCount == 7) {
-                logMethod.invoke(api, message, level, pluginName, null, null, null, null);
+                logMethod.invoke(api, message, level, pluginName, null, null, null, safeColumns);
             }
         } catch (IllegalAccessException | InvocationTargetException e) {
             plugin.getLogger().warning("Failed to forward log to ElasticBuffer: " + e.getMessage());

@@ -19,7 +19,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -240,11 +242,12 @@ public class ChatEngagementService {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
                 .build();
+        Map<String, String> columns = engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "engagement");
         logToFile("Sending engagement request " + request.requestId + " to " + targetUrl
-                + " for bot=" + botSession.getProfile().getName() + ", target=" + request.targetPlayer);
-        logToFile("Engagement request " + request.requestId + " payload: " + payload);
+                + " for bot=" + botSession.getProfile().getName() + ", target=" + request.targetPlayer, columns);
+        logToFile("Engagement request " + request.requestId + " payload: " + payload, columns);
         logToFile("Engagement request " + request.requestId + " timeouts: connect="
-                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms", columns);
 
         httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
@@ -253,11 +256,13 @@ public class ChatEngagementService {
                         plugin.getLogger().warning("Engagement API responded with status " + response.statusCode());
                         logToFile("Engagement response " + request.requestId + " status " + response.statusCode()
                                 + ", durationMs=" + durationMillis
-                                + ", payload=" + response.body());
+                                + ", payload=" + response.body(),
+                                engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, response.body(), response.statusCode(), "engagement"));
                         return null;
                     }
                     logToFile("Engagement response " + request.requestId + " durationMs=" + durationMillis
-                            + ", payload=" + response.body());
+                            + ", payload=" + response.body(),
+                            engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, response.body(), response.statusCode(), "engagement"));
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenAccept(response -> handlePlannerResponse(botSession, response))
@@ -267,8 +272,9 @@ public class ChatEngagementService {
                     String message = "Engagement API request failed after " + durationMillis + "ms to " + targetUrl
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
-                    logToFile(message);
-                    logToFile("Engagement request " + request.requestId + " payload (failure): " + payload);
+                    logToFile(message, engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "engagement"));
+                    logToFile("Engagement request " + request.requestId + " payload (failure): " + payload,
+                            engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "engagement"));
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNext(nowMillis));
@@ -514,12 +520,13 @@ public class ChatEngagementService {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
                 .build();
+        Map<String, String> columns = engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "bot2bot");
         logToFile("Sending bot2bot engagement request " + request.requestId + " to " + targetUrl
                 + " for bot=" + botSession.getProfile().getName()
-                + ", target=" + request.targetPlayer);
-        logToFile("Bot2bot engagement request " + request.requestId + " payload: " + payload);
+                + ", target=" + request.targetPlayer, columns);
+        logToFile("Bot2bot engagement request " + request.requestId + " payload: " + payload, columns);
         logToFile("Bot2bot engagement request " + request.requestId + " timeouts: connect="
-                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
+                + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms", columns);
 
         httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
@@ -528,11 +535,13 @@ public class ChatEngagementService {
                         plugin.getLogger().warning("Bot2bot engagement API responded with status " + response.statusCode());
                         logToFile("Bot2bot engagement response " + request.requestId + " status " + response.statusCode()
                                 + ", durationMs=" + durationMillis
-                                + ", payload=" + response.body());
+                                + ", payload=" + response.body(),
+                                engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, response.body(), response.statusCode(), "bot2bot"));
                         return null;
                     }
                     logToFile("Bot2bot engagement response " + request.requestId + " durationMs=" + durationMillis
-                            + ", payload=" + response.body());
+                            + ", payload=" + response.body(),
+                            engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, response.body(), response.statusCode(), "bot2bot"));
                     return gson.fromJson(response.body(), PlannerResponse.class);
                 })
                 .thenAccept(response -> handlePlannerResponse(botSession, response))
@@ -542,18 +551,58 @@ public class ChatEngagementService {
                     String message = "Bot2bot engagement API request failed after " + durationMillis + "ms to " + targetUrl
                             + " for request " + request.requestId + ": " + details;
                     plugin.getLogger().warning(message);
-                    logToFile(message);
-                    logToFile("Bot2bot engagement request " + request.requestId + " payload (failure): " + payload);
+                    logToFile(message, engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "bot2bot"));
+                    logToFile("Bot2bot engagement request " + request.requestId + " payload (failure): " + payload,
+                            engagementColumns(request.requestId, botSession, request.targetPlayer, targetUrl, payload, null, null, "bot2bot"));
                     return null;
                 })
                 .whenComplete((ignored, throwable) -> scheduleNextBot2Bot(nowMillis));
     }
 
     private void logToFile(String message) {
+        logToFile(message, java.util.Collections.emptyMap());
+    }
+
+    private void logToFile(String message, Map<String, String> columns) {
         AIPlayersFileLogger fileLogger = getFileLogger();
         if (fileLogger != null) {
-            fileLogger.info(message);
+            fileLogger.info(message, columns);
         }
+    }
+
+    private Map<String, String> engagementColumns(String transactionId,
+                                                  AIPlayerSession session,
+                                                  String targetPlayer,
+                                                  String targetUrl,
+                                                  String requestPayload,
+                                                  String responsePayload,
+                                                  Integer httpResponseCode,
+                                                  String flowType) {
+        Map<String, String> columns = new LinkedHashMap<>();
+        columns.put("transactionId", transactionId);
+        if (flowType != null) {
+            columns.put("flowType", flowType);
+        }
+        if (session != null && session.getProfile() != null) {
+            columns.put("botId", String.valueOf(session.getProfile().getUuid()));
+            columns.put("botName", String.valueOf(session.getProfile().getName()));
+        }
+        if (targetPlayer != null) {
+            columns.put("playerName", targetPlayer);
+        }
+        if (targetUrl != null) {
+            columns.put("targetUrl", targetUrl);
+        }
+        if (requestPayload != null) {
+            columns.put("request", requestPayload);
+        }
+        if (responsePayload != null) {
+            columns.put("response", responsePayload);
+        }
+        if (httpResponseCode != null) {
+            columns.put("httpResponseCode", String.valueOf(httpResponseCode));
+        }
+        return columns;
     }
 
     private AIPlayersFileLogger getFileLogger() {
