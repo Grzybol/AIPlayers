@@ -87,15 +87,22 @@ public class RemotePlannerAIController implements AIController {
         logToFile("Planner request " + request.requestId + " timeouts: connect="
                         + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms",
                 plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(targetUrl))
-                .version(HttpClient.Version.HTTP_1_1)
-                .timeout(config.getRequestTimeout())
-                .header("Content-Type", "application/json")
-                .header("Connection", "close")
-                .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
-                .build();
-        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json, Connection=close, HttpVersion=HTTP/1.1",
+        HttpRequest httpRequest;
+        try {
+            httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(targetUrl))
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .timeout(config.getRequestTimeout())
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
+                    .build();
+        } catch (IllegalArgumentException ex) {
+            String message = "Planner request " + request.requestId + " could not be built: " + ex.getMessage();
+            plugin.getLogger().warning(message);
+            logToFile(message, plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
+            return CompletableFuture.completedFuture(Action.idle());
+        }
+        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json, HttpVersion=HTTP/1.1",
                 plannerColumns(transactionId, session, targetUrl, payload, null, null, null));
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
