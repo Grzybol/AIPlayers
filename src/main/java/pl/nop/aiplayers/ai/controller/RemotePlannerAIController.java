@@ -53,6 +53,7 @@ public class RemotePlannerAIController implements AIController {
         this.config = config;
         this.gson = new Gson();
         this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(config.getConnectTimeout())
                 .build();
         this.lastRequestMillis = new ConcurrentHashMap<>();
@@ -83,11 +84,13 @@ public class RemotePlannerAIController implements AIController {
                 + config.getConnectTimeout().toMillis() + "ms, request=" + config.getRequestTimeout().toMillis() + "ms");
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(targetUrl))
+                .version(HttpClient.Version.HTTP_1_1)
                 .timeout(config.getRequestTimeout())
                 .header("Content-Type", "application/json")
+                .header("Connection", "close")
                 .POST(HttpRequest.BodyPublishers.ofString(payload, StandardCharsets.UTF_8))
                 .build();
-        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json");
+        logToFile("Planner request " + request.requestId + " headers: Content-Type=application/json, Connection=close, HttpVersion=HTTP/1.1");
 
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
