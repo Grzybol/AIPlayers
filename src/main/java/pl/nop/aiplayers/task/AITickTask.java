@@ -9,11 +9,13 @@ import pl.nop.aiplayers.ai.ActionExecutor;
 import pl.nop.aiplayers.ai.Perception;
 import pl.nop.aiplayers.ai.controller.AIController;
 import pl.nop.aiplayers.ai.controller.AIControllerRegistry;
+import pl.nop.aiplayers.ai.movement.RoamingService;
 import pl.nop.aiplayers.chat.AIChatService;
 import pl.nop.aiplayers.chat.engagement.ChatEngagementService;
 import pl.nop.aiplayers.economy.AIEconomyService;
 import pl.nop.aiplayers.manager.AIPlayerManager;
 import pl.nop.aiplayers.model.AIPlayerSession;
+import pl.nop.aiplayers.model.AIControllerType;
 import pl.nop.aiplayers.npc.NPCHandle;
 
 import java.util.ArrayList;
@@ -29,10 +31,11 @@ public class AITickTask extends BukkitRunnable {
     private final AIChatService chatService;
     private final ActionExecutor actionExecutor;
     private final ChatEngagementService engagementService;
+    private final RoamingService roamingService;
 
     public AITickTask(pl.nop.aiplayers.AIPlayersPlugin plugin, AIPlayerManager manager, AIControllerRegistry controllerRegistry,
                       AIEconomyService economyService, AIChatService chatService, ActionExecutor actionExecutor,
-                      ChatEngagementService engagementService) {
+                      ChatEngagementService engagementService, RoamingService roamingService) {
         this.plugin = plugin;
         this.manager = manager;
         this.controllerRegistry = controllerRegistry;
@@ -40,6 +43,7 @@ public class AITickTask extends BukkitRunnable {
         this.chatService = chatService;
         this.actionExecutor = actionExecutor;
         this.engagementService = engagementService;
+        this.roamingService = roamingService;
     }
 
     @Override
@@ -52,17 +56,56 @@ public class AITickTask extends BukkitRunnable {
             if (npc.getLocation() == null) {
                 continue;
             }
+            lookAtNearestPlayer(session, npc.getLocation());
             actionExecutor.tick(session);
             Perception perception = buildPerception(session);
             AIController controller = controllerRegistry.getController(session.getProfile().getControllerType());
             CompletableFuture<Action> future = controller.decide(session, perception);
             future.thenAccept(action -> {
-                if (action == null) {
-                    return;
-                }
-                Bukkit.getScheduler().runTask(plugin, () -> actionExecutor.submit(session, action));
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (action != null) {
+                        actionExecutor.submit(session, action);
+                    }
+                    if (shouldApplyLocalMovement(session, action)) {
+                        Action fallback = buildLocalMovementAction(session, npc.getLocation());
+                        if (fallback != null) {
+                            actionExecutor.submit(session, fallback);
+                        }
+                    }
+                });
             });
         }
+    }
+
+    private void lookAtNearestPlayer(AIPlayerSession session, Location npcLocation) {
+        if (npcLocation == null || npcLocation.getWorld() == null) {
+            return;
+        }
+        Player nearest = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Player player : npcLocation.getWorld().getPlayers()) {
+            double distance = player.getLocation().distanceSquared(npcLocation);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                nearest = player;
+            }
+        }
+        if (nearest != null) {
+            Location target = nearest.getLocation().clone();
+            target.setY(npcLocation.getY());
+            session.getNpcHandle().lookAt(target);
+        }
+    }
+
+    private boolean shouldApplyLocalMovement(AIPlayerSession session, Action action) {
+        if (session.getProfile().getControllerType() == AIControllerType.REMOTE) {
+            return true;
+        }
+        return action == null || action.getType() == pl.nop.aiplayers.ai.ActionType.IDLE;
+    }
+
+    private Action buildLocalMovementAction(AIPlayerSession session, Location current) {
+        return roamingService.buildRoamAction(session, current);
     }
 
     private Perception buildPerception(AIPlayerSession session) {

@@ -9,6 +9,13 @@ Poniższy dokument opisuje **requesty wysyłane przez plugin** do zewnętrznych 
 - Endpoint: `base-url + plan-path` (domyślnie `/v1/plan`).
 - Tryb wysyłki: przy każdej decyzji AI, ale **nie częściej** niż co `request-interval-millis`, chyba że nastąpiła nowa aktywność czatu (wtedy request może zostać wysłany wcześniej).
 
+### Zmiana po PR #61 (wybór jednego bota)
+- **Nie zmienił się kontrakt HTTP** (ten sam endpoint, ten sam JSON request/response).
+- Zmieniła się tylko logika wyboru respondenta: dla jednej wiadomości gracza plugin wybiera **dokładnie jednego** bota, który wyśle request do `/v1/plan`.
+- Jeżeli wiadomość gracza zawiera nick bota, priorytet ma bot wspomniany w tej wiadomości (gdy wspomnianych jest kilku, wybór jest losowy z tej grupy).
+- Jeżeli nie ma wzmianki o nicku, wybór jest losowy spośród botów online.
+- W praktyce `ai.remote.max-bots-per-player-message` nie wpływa już na liczbę requestów dla pojedynczej wiadomości gracza (zawsze 1 request).
+
 ### Ile wiadomości z czatu jest wysyłanych
 Plugin pobiera snapshot historii czatu i wysyła **ostatnie N wpisów**, gdzie `N` = `ai.remote.chat-limit` (domyślnie 10). Jeśli historia jest krótsza, wysyłana jest cała dostępna lista. Każda linia czatu jest mapowana na obiekt z metadanymi (timestamp, nadawca, typ nadawcy, treść).
 
@@ -198,6 +205,9 @@ Do requestu trafia **ostatnie N wiadomości czatu**, gdzie `N` = `chat.engagemen
 ### Oczekiwana odpowiedź
 Odpowiedź jest kompatybilna z plannerem (`PlannerResponse`) i zawiera listę akcji, z których
 plugin wybiera wiadomość dla konkretnego bota.
+
+> Uwaga: ponieważ request dotyczy pojedynczego bota, integracja powinna zawsze zwracać co najmniej
+> jedną akcję dla `bot_id` z requestu. Brak akcji dla tego `bot_id` spowoduje brak wiadomości po stronie pluginu.
 
 ```json
 {
